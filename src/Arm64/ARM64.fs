@@ -778,7 +778,7 @@ module ARM64 =
                 Unsafe.As<AssemblerLabel>(l)
 
             member x.Jump(offset : int) : unit =
-                x.jmp(offset)
+                x.jmp(offset + 4)
                 
             member x.Jump(label : AssemblerLabel) : unit =
                 if label.Position >= 0L then

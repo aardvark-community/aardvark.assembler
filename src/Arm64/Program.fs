@@ -156,6 +156,15 @@ type FragmentProgram<'a>() =
 
         frag
 
+    member x.InsertBefore(ref : Fragment<'a>, tag : 'a, compile : option<'a> -> 'a -> IAssemblerStream -> unit) =
+        let ref = if isNull ref then last else ref
+        x.InsertAfter(ref.Prev, tag, compile)
+
+    member x.Append(tag : 'a, compile : option<'a> -> 'a -> IAssemblerStream -> unit) =
+        x.InsertBefore(null, tag, compile)
+
+    member x.Prepend(tag : 'a, compile : option<'a> -> 'a -> IAssemblerStream -> unit) =
+        x.InsertAfter(null, tag, compile)
 
     member x.Run() =
         let action = 
@@ -211,7 +220,7 @@ and [<AllowNullLiteral>] Fragment<'a>(manager : MemoryManager, tag : 'a, ptr : m
     member x.WriteJump() : unit =
         if isNull next then writeJump 0
         else 
-            let ref = ptr.Offset + ptr.Size - nativeint jumpSize 
+            let ref = ptr.Offset + ptr.Size
             writeJump (int (next.Offset - ref))
 
     // member x.Write(data : Memory<byte>) =
