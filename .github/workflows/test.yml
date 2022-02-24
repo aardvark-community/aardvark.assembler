@@ -1,0 +1,26 @@
+name: Test
+on:
+  push:
+    branches:
+      - master
+jobs:
+  pack:
+    name: Test
+    runs-on: macos-11
+    steps:  
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Install Dotnet
+        uses: actions/setup-dotnet@v1
+        with:
+          dotnet-version: '6.0.100'
+      - name: Restore Tools
+        run: dotnet tool restore
+      - name: Paket Restore
+        run: dotnet paket restore
+      - name: Build Native
+        run: ./buildnative.sh
+      - name: Build
+        run: dotnet build Arm64.sln
+      - name: Test
+        run: dotnet run --project src/Arm64/Arm64.fsproj
