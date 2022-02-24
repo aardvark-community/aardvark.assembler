@@ -24,10 +24,284 @@ let print =
         printfn "%A" a
     )
 
+
+type JitMem private() =
+    [<DllImport("jitmem")>]
+    static extern uint32 epageSize()
+
+    [<DllImport("jitmem")>]
+    static extern nativeint ealloc(unativeint size)
+    
+    [<DllImport("jitmem")>]
+    static extern void efree(nativeint ptr, unativeint size)
+    
+    [<DllImport("jitmem")>]
+    static extern void ecpy(nativeint dst, nativeint src, unativeint size)
+
+    static let mutable pageSize = ref 0un
+
+    static member PageSize = 
+        lock pageSize (fun () ->
+            if pageSize.Value = 0un then
+                let s = epageSize() |> unativeint
+                pageSize.Value <- s
+                s
+            else
+                pageSize.Value
+        )
+
+    static member Alloc(size : nativeint) =
+        if size <= 0n then
+            0n
+        else
+            let ps = ExecutableMemory.PageSize
+            let effectiveSize =
+                if unativeint size % ps = 0un then unativeint size
+                else (1un + unativeint size / ps) * ps
+            ealloc effectiveSize
+
+    static member Free(ptr : nativeint, size : nativeint) =
+        if size > 0n then
+            let ps = ExecutableMemory.PageSize
+            let effectiveSize =
+                if unativeint size % ps = 0un then unativeint size
+                else (1un + unativeint size / ps) * ps
+            efree(ptr, effectiveSize)
+
+    static member Copy(src : nativeint, dst : nativeint, size : nativeint) =
+        if size > 0n then
+            ecpy(dst, src, unativeint size)
+
+type FragmentProgram<'a>() =
+    static let initialCapacity = 64n <<< 10
+    static let config = 
+        {
+            MemoryManagerConfig.malloc = fun size -> JitMem.Alloc size
+            MemoryManagerConfig.mfree = fun ptr size -> JitMem.Free(ptr, size)
+            MemoryManagerConfig.mcopy = fun src dst size -> JitMem.Copy(src, dst, size)
+        }
+    
+    static let compile (action : IAssemblerStream -> unit) : Memory<byte> =
+        use ms = new SystemMemoryStream()
+        use ass = AssemblerStream.create ms
+        action ass
+        ass.Jump 0
+        ms.ToMemory()
+
+    let manager = new Aardvark.Base.MemoryManager(initialCapacity, config)
+
+    let wrapLock = obj()
+    let mutable pAction = 0n
+    let mutable action = Unchecked.defaultof<System.Action>
+
+    let first, last =
+        let prolog = compile (fun ass -> ass.BeginFunction())
+        let epilog = compile (fun ass -> ass.EndFunction(); ass.Ret())
+
+        let pProlog = 
+            let block = manager.Alloc(prolog.Length)
+            block.Use(fun pDst -> 
+                use src = prolog.Pin()
+                let pSrc = NativePtr.toNativeInt (NativePtr.ofVoidPtr<byte> src.Pointer)
+                JitMem.Copy(pSrc, pDst, nativeint prolog.Length)
+            )
+            block
+            
+        let pEpilog = 
+            let block = manager.Alloc(epilog.Length)
+            block.Use(fun pDst -> 
+                use src = epilog.Pin()
+                let pSrc = NativePtr.toNativeInt (NativePtr.ofVoidPtr<byte> src.Pointer)
+                JitMem.Copy(pSrc, pDst, nativeint epilog.Length)
+            )
+            block
+
+        let fProlog = Fragment<'a>(manager, Unchecked.defaultof<'a>, pProlog)
+        let fEpilog = Fragment<'a>(manager, Unchecked.defaultof<'a>, pEpilog)
+        fProlog.Next <- fEpilog
+        fEpilog.Prev <- fProlog
+        fProlog.WriteJump()
+        fProlog, fEpilog
+
+
+    member x.InsertAfter(ref : Fragment<'a>, tag : 'a, compile : option<'a> -> 'a -> IAssemblerStream -> unit) =
+        let ref = if isNull ref then first else ref
+        use ms = new SystemMemoryStream()
+        use ass = AssemblerStream.create ms
+        let prevTag = 
+            if ref = first then None
+            else Some ref.Tag
+
+        compile prevTag tag ass
+        ass.Jump(0)
+
+        let code = ms.ToMemory()
+        let block = manager.Alloc(nativeint code.Length)
+
+        block.Use (fun pDst ->
+            use src = code.Pin()
+            let pSrc = NativePtr.toNativeInt (NativePtr.ofVoidPtr<byte> src.Pointer)
+            JitMem.Copy(pSrc, pDst, nativeint code.Length)
+        )
+
+        let frag = new Fragment<'a>(manager, tag, block)
+
+        let oldNext = ref.Next
+        frag.Next <- oldNext
+        frag.Prev <- ref
+        oldNext.Prev <- frag
+        ref.Next <- frag
+        frag.WriteJump()
+        ref.WriteJump()
+
+        frag
+
+
+    member x.Run() =
+        let action = 
+            lock wrapLock (fun () ->
+                let ptr = manager.Pointer + first.Offset
+                if ptr <> pAction then
+                    pAction <- ptr
+                    action <- Marshal.GetDelegateForFunctionPointer<System.Action>(ptr)
+                action
+            )
+        action.Invoke()
+
+
+
+
+
+and [<AllowNullLiteral>] Fragment<'a>(manager : MemoryManager, tag : 'a, ptr : managedptr) =
+    let mutable ptr = ptr
+    let mutable prev : Fragment<'a> = null
+    let mutable next : Fragment<'a> = null
+
+    static let jumpSize =
+        use ms = new SystemMemoryStream()
+        use ass = AssemblerStream.create ms
+        ass.Jump(0)
+        ms.ToMemory().Length
+
+    let writeJump(offset : int) =  
+        let code = 
+            use ms = new SystemMemoryStream()
+            use ass = AssemblerStream.create ms
+            ass.Jump offset
+            ms.ToMemory()
+
+        ptr.Use (fun dstPtr ->
+            let pDst = dstPtr + ptr.Size - nativeint code.Length
+            use src = code.Pin()
+            let srcPtr = src.Pointer |> NativePtr.ofVoidPtr<byte> |> NativePtr.toNativeInt
+            JitMem.Copy(srcPtr, pDst, nativeint code.Length)
+        )
+
+    member x.Prev
+        with get() : Fragment<'a> = prev
+        and set (p : Fragment<'a>) = prev <- p
+
+    member x.Next
+        with get() : Fragment<'a> = next
+        and set (n : Fragment<'a>) = next <- n
+
+
+    member x.Offset : nativeint = ptr.Offset
+
+    member x.WriteJump() : unit =
+        if isNull next then writeJump 0
+        else 
+            let ref = ptr.Offset + ptr.Size - nativeint jumpSize 
+            writeJump (int (next.Offset - ref))
+
+    // member x.Write(data : Memory<byte>) =
+    //     let size = nativeint data.Length
+    //     if size = ptr.Size then
+    //         use src = data.Pin()
+    //         let srcPtr = src.Pointer |> NativePtr.ofVoidPtr<byte> |> NativePtr.toNativeInt
+    //         ptr.Use(fun dstPtr -> JitMem.Copy(srcPtr, dstPtr, ptr.Size))
+    //     else
+    //         let n = manager.Alloc(size)
+    //         use src = data.Pin()
+    //         let srcPtr = src.Pointer |> NativePtr.ofVoidPtr<byte> |> NativePtr.toNativeInt
+    //         n.Use(fun dstPtr -> JitMem.Copy(srcPtr, dstPtr, ptr.Size))
+    //         manager.Free ptr
+    //         ptr <- n
+    //         if not (isNull prev) then prev.WriteJump()
+
+    //     x.WriteJump()
+            
+    member x.Tag : 'a = tag
+
+    // member x.Update(compile : option<'a> -> 'a -> IAssemblerStream -> unit) =
+    //     let prevTag = 
+    //         if isNull prev then None
+    //         else Some prev.Tag
+    //     use ms = new SystemMemoryStream()
+    //     use ass = AssemblerStream.create ms
+    //     compile prevTag tag ass
+    //     let jumpOffset = ms.Position
+    //     ass.Jump(0)
+
+    //     let code = ms.ToMemory()
+    //     let block = manager.Alloc(nativeint code.Length)
+
+    //     code.CopyTo(System.Span<byte>())
+
+    //     ptr.Use (fun dstPtr ->
+    //         let pDst = dstPtr + ptr.Size - nativeint code.Length
+    //         use src = code.Pin()
+    //         let srcPtr = src.Pointer |> NativePtr.ofVoidPtr<byte> |> NativePtr.toNativeInt
+    //         JitMem.Copy(srcPtr, pDst, nativeint code.Length)
+    //     )
+
+    //     x.WriteJump()
+
+    member x.Dispose() =
+        let p = prev
+        let n = next
+
+        n.Prev <- p
+        p.Next <- n
+
+        prev <- null
+        next <- null
+        manager.Free ptr
+        p.WriteJump()
+
+
+
 [<EntryPoint>]
 let main _ =
     Aardvark.Init()
     let printInt = Marshal.GetFunctionPointerForDelegate print
+
+    let prog = FragmentProgram<int>()
+
+    let a = 
+        prog.InsertAfter(null, 1, fun _ v s ->
+            s.BeginCall 1
+            s.PushArg v
+            s.Call printInt
+        )
+
+    let b = 
+        prog.InsertAfter(a, 2, fun _ v s ->
+            s.BeginCall 1
+            s.PushArg v
+            s.Call printInt
+        )
+    printfn "run"
+    prog.Run()
+    printfn "done"
+    
+    a.Dispose()
+    printfn "run"
+    prog.Run()
+    printfn "done"
+
+
+    exit 0
 
     let baseStream = new SystemMemoryStream()
     let s = AssemblerStream.create baseStream
