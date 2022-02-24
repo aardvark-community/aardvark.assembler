@@ -14,7 +14,7 @@ type IntDelegate = delegate of unit -> int
 
 // type MyFun = delegate of uint32 * uint32 * uint32 * uint32 * uint32 * uint32 * uint32 * uint32 -> unit
 
-type MyFun = delegate of float32 * uint64 * uint64 * uint64 * uint64 * uint64 * uint64 * uint64 * uint32 * uint64 * float -> unit
+type MyFun = delegate of nativeint * uint64 * uint64 * uint64 * uint64 * uint64 * uint64 * uint64 * uint32 * uint64 * float -> unit
 type IntDel = delegate of int -> unit
 
 let thing = MyFun (fun a b c d e f g h i j k -> printfn "yeah: %A" (a,b,c,d,e,f,g,h,i,j,k))
@@ -63,7 +63,7 @@ let main _ =
     s.PushArg 3n
     s.PushArg 2n
     s.PushArg 1n
-    s.PushFloatArg (NativePtr.toNativeInt pFloat)
+    s.PushArg 0n
     s.Call(ff)
 
     // let r0 = s.ArgumentRegisters.[0]
@@ -81,6 +81,9 @@ let main _ =
     // s.Set(r2, -1)
     // s.AddInt(r1, r2, false)
     // s.Store(r0, r1, false)
+
+
+
 
     // s.Cmp(NativePtr.toNativeInt counter, 0)
     // s.Jump(JumpCondition.GreaterEqual, b)
