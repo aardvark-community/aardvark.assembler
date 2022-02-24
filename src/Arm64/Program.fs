@@ -96,9 +96,18 @@ type JitMem private() =
                 let pSrc = hSrc.Pointer |> NativePtr.ofVoidPtr<byte> |> NativePtr.toNativeInt
                 ecpy(pDst + dstOffset, pSrc, unativeint src.Length)
             )
-            
 
-type FragmentProgram<'a> private(differential : bool, compile : option<'a> -> 'a -> IAssemblerStream -> unit) =
+type internal FragmentProgramState<'a> =
+    {
+        differential : bool
+        toWriteJump : System.Collections.Generic.HashSet<Fragment<'a>>
+        toUpdate : System.Collections.Generic.HashSet<Fragment<'a>>
+        manager : MemoryManager
+        mutable prolog : Fragment<'a>
+        mutable epilog : Fragment<'a>
+    }
+
+and FragmentProgram<'a> private(differential : bool, compile : option<'a> -> 'a -> IAssemblerStream -> unit) =
     static let initialCapacity = 64n <<< 10
     static let config = 
         {
@@ -119,11 +128,22 @@ type FragmentProgram<'a> private(differential : bool, compile : option<'a> -> 'a
 
     let wrapLock = obj()
     let mutable pAction = 0n
+    let mutable entry = NativePtr.alloc<nativeint> 1
     let mutable action = Unchecked.defaultof<System.Action>
 
     let toUpdate = System.Collections.Generic.HashSet<Fragment<'a>>()
     let toWriteJump = System.Collections.Generic.HashSet<Fragment<'a>>()
 
+    
+    let state =
+        {
+            toWriteJump = toWriteJump
+            toUpdate = toUpdate
+            manager = manager
+            differential = differential
+            prolog = null
+            epilog = null
+        }
 
     let mutable first, last =
         let prolog = toMemory (fun ass -> ass.BeginFunction())
@@ -139,8 +159,11 @@ type FragmentProgram<'a> private(differential : bool, compile : option<'a> -> 'a
             JitMem.Copy(epilog, block)
             block
 
-        let fProlog = new Fragment<'a>(differential, toWriteJump, toUpdate, null, manager, Unchecked.defaultof<'a>, pProlog)
-        let fEpilog = new Fragment<'a>(differential, toWriteJump, toUpdate, fProlog, manager, Unchecked.defaultof<'a>, pEpilog)
+        let fProlog = new Fragment<'a>(state, Unchecked.defaultof<'a>, pProlog)
+        let fEpilog = new Fragment<'a>(state, Unchecked.defaultof<'a>, pEpilog)
+        state.prolog <- fProlog
+        state.epilog <- fEpilog
+
         fProlog.Next <- fEpilog
         fEpilog.Prev <- fProlog
         fProlog.WriteJump()
@@ -163,7 +186,7 @@ type FragmentProgram<'a> private(differential : bool, compile : option<'a> -> 'a
 
         let block = manager.Alloc(nativeint code.Length)
         JitMem.Copy(code, block)
-        let frag = new Fragment<'a>(differential, toWriteJump, toUpdate, first, manager, tag, block)
+        let frag = new Fragment<'a>(state, tag, block)
 
         frag.Next <- next
         frag.Prev <- ref
@@ -197,25 +220,37 @@ type FragmentProgram<'a> private(differential : bool, compile : option<'a> -> 'a
             manager.Dispose()
             action <- Unchecked.defaultof<_>
             pAction <- 0n
+            NativePtr.free entry
+            entry <- NativePtr.zero
 
-    member x.Run() =
-        if isNull first then raise <| ObjectDisposedException "FragmentProgram"
+    member x.Clear() =
+        let mutable f = first.Next
+        while not (Object.ReferenceEquals(f, last)) do
+            let n = f.Next
+            f.Dispose()
+            f <- n
 
+    member x.Update() =
         for u in toUpdate do u.Update(compile)
         toUpdate.Clear()
 
         for j in toWriteJump do j.WriteJump()
         toWriteJump.Clear()
 
-        let action = 
-            lock wrapLock (fun () ->
-                let ptr = manager.Pointer + first.Offset
-                if ptr <> pAction then
-                    pAction <- ptr
-                    action <- Marshal.GetDelegateForFunctionPointer<System.Action>(ptr)
-                action
-            )
+        lock wrapLock (fun () ->
+            let ptr = manager.Pointer + first.Offset
+            if ptr <> pAction then
+                NativePtr.write entry ptr
+                pAction <- ptr
+                action <- Marshal.GetDelegateForFunctionPointer<System.Action>(ptr)
+        )
+
+
+    member x.Run() =
+        x.Update()
         action.Invoke()
+
+    member x.EntryPointer = entry
 
     interface IDisposable with
         member x.Dispose() = x.Dispose()
@@ -223,7 +258,7 @@ type FragmentProgram<'a> private(differential : bool, compile : option<'a> -> 'a
     new(compile : option<'a> -> 'a -> IAssemblerStream -> unit) = new FragmentProgram<'a>(true, compile)
     new(compile : 'a -> IAssemblerStream -> unit) = new FragmentProgram<'a>(false, fun _ t s -> compile t s)
 
-and [<AllowNullLiteral>] Fragment<'a>(differential : bool, toWriteJump : System.Collections.Generic.HashSet<Fragment<'a>>, toUpdate : System.Collections.Generic.HashSet<Fragment<'a>>, prolog : Fragment<'a>, manager : MemoryManager, tag : 'a, ptr : managedptr) =
+and [<AllowNullLiteral>] Fragment<'a> internal(state : FragmentProgramState<'a>, tag : 'a, ptr : managedptr) =
     static let toMemory (action : System.IO.Stream -> IAssemblerStream -> unit) : Memory<byte> =
         use ms = new SystemMemoryStream()
         use ass = AssemblerStream.create ms
@@ -269,19 +304,19 @@ and [<AllowNullLiteral>] Fragment<'a>(differential : bool, toWriteJump : System.
             JitMem.Copy(data, ptr)
         else
             let old = ptr
-            let n = manager.Alloc(size)
+            let n = state.manager.Alloc(size)
             JitMem.Copy(data, n)
             ptr <- n
-            if not (isNull prev) then toWriteJump.Add prev |> ignore
-            manager.Free old
+            if not (isNull prev) then state.toWriteJump.Add prev |> ignore
+            state.manager.Free old
 
-        toWriteJump.Add x |> ignore
+        state.toWriteJump.Add x |> ignore
             
     member x.Tag : 'a = tag
 
     member internal x.Update(compile : OptimizedClosures.FSharpFunc<option<'a>, 'a, IAssemblerStream, unit>) : unit =
         let prevTag = 
-            if Object.ReferenceEquals(prev, prolog) then None
+            if Object.ReferenceEquals(prev, state.prolog) then None
             else Some prev.Tag
 
         let code = 
@@ -293,20 +328,22 @@ and [<AllowNullLiteral>] Fragment<'a>(differential : bool, toWriteJump : System.
         x.Write code
 
 
-    member x.Dispose() =
+    member x.Dispose() : unit =
         let p = prev
         let n = next
 
-        n.Prev <- p
-        p.Next <- n
+        if not (isNull n) then n.Prev <- p
+        if not (isNull p) then p.Next <- n
 
-        manager.Free ptr
-        toWriteJump.Add p |> ignore
-        if differential then
-            toUpdate.Remove x |> ignore
-            toUpdate.Add n |> ignore
+        state.manager.Free ptr
+        if not (isNull p) then state.toWriteJump.Add p |> ignore
+        if state.differential then
+            state.toUpdate.Remove x |> ignore
+            if not (isNull n) && not (Object.ReferenceEquals(n, state.epilog)) then state.toUpdate.Add n |> ignore
 
-        toWriteJump.Remove x |> ignore
+        state.toWriteJump.Remove x |> ignore
+        prev <- null
+        next <- null
         
 
 
@@ -350,6 +387,28 @@ let main _ =
 
     let d = prog.InsertAfter(c, 4)
     let e = prog.InsertAfter(null, 6)
+    
+    Log.start "run"
+    prog.Run()
+    Log.stop()
+
+    d.Dispose()
+    e.Dispose()
+    c.Dispose()
+    b.Dispose()
+    
+    Log.start "run"
+    prog.Run()
+    Log.stop()
+
+    let x = prog.Prepend 2
+    let y = prog.Prepend 1
+
+    Log.start "run"
+    prog.Run()
+    Log.stop()
+
+    prog.Clear()
     
     Log.start "run"
     prog.Run()
