@@ -21,7 +21,7 @@ let thing = MyFun (fun a b c d e f g h i j k -> printfn "yeah: %A" (a,b,c,d,e,f,
 
 let print =
     IntDel (fun a -> 
-        printfn "%A" a
+        Log.line "%d" a
     )
 
 
@@ -72,7 +72,33 @@ type JitMem private() =
         if size > 0n then
             ecpy(dst, src, unativeint size)
 
-type FragmentProgram<'a>() =
+
+    static member Copy(src : Memory<byte>, dst : nativeint) =
+        if src.Length > 0 then
+            use hSrc = src.Pin()
+            let pSrc = hSrc.Pointer |> NativePtr.ofVoidPtr<byte> |> NativePtr.toNativeInt
+            ecpy(dst, pSrc, unativeint src.Length)
+            
+    static member Copy(src : Memory<byte>, dst : managedptr) =
+        if src.Length > 0 then
+            if nativeint src.Length <> dst.Size then failwithf "inconsitent copy-size: %d vs %d" src.Length dst.Size
+            dst.Use (fun pDst ->
+                use hSrc = src.Pin()
+                let pSrc = hSrc.Pointer |> NativePtr.ofVoidPtr<byte> |> NativePtr.toNativeInt
+                ecpy(pDst, pSrc, unativeint src.Length)
+            )
+            
+    static member Copy(src : Memory<byte>, dst : managedptr, dstOffset : nativeint) =
+        if src.Length > 0 then
+            if dstOffset + nativeint src.Length > dst.Size then failwithf "copy range exceeds dst size: %d + %d vs %d" dstOffset src.Length dst.Size
+            dst.Use (fun pDst ->
+                use hSrc = src.Pin()
+                let pSrc = hSrc.Pointer |> NativePtr.ofVoidPtr<byte> |> NativePtr.toNativeInt
+                ecpy(pDst + dstOffset, pSrc, unativeint src.Length)
+            )
+            
+
+type FragmentProgram<'a> private(differential : bool, compile : option<'a> -> 'a -> IAssemblerStream -> unit) =
     static let initialCapacity = 64n <<< 10
     static let config = 
         {
@@ -81,92 +107,106 @@ type FragmentProgram<'a>() =
             MemoryManagerConfig.mcopy = fun src dst size -> JitMem.Copy(src, dst, size)
         }
     
-    static let compile (action : IAssemblerStream -> unit) : Memory<byte> =
+    static let toMemory (action : IAssemblerStream -> unit) : Memory<byte> =
         use ms = new SystemMemoryStream()
         use ass = AssemblerStream.create ms
         action ass
         ass.Jump 0
         ms.ToMemory()
 
-    let manager = new Aardvark.Base.MemoryManager(initialCapacity, config)
+    let compile = OptimizedClosures.FSharpFunc<_,_,_,_>.Adapt compile
+    let manager = new MemoryManager(initialCapacity, config)
 
     let wrapLock = obj()
     let mutable pAction = 0n
     let mutable action = Unchecked.defaultof<System.Action>
 
-    let first, last =
-        let prolog = compile (fun ass -> ass.BeginFunction())
-        let epilog = compile (fun ass -> ass.EndFunction(); ass.Ret())
+    let toUpdate = System.Collections.Generic.HashSet<Fragment<'a>>()
+    let toWriteJump = System.Collections.Generic.HashSet<Fragment<'a>>()
+
+
+    let mutable first, last =
+        let prolog = toMemory (fun ass -> ass.BeginFunction())
+        let epilog = toMemory (fun ass -> ass.EndFunction(); ass.Ret())
 
         let pProlog = 
             let block = manager.Alloc(prolog.Length)
-            block.Use(fun pDst -> 
-                use src = prolog.Pin()
-                let pSrc = NativePtr.toNativeInt (NativePtr.ofVoidPtr<byte> src.Pointer)
-                JitMem.Copy(pSrc, pDst, nativeint prolog.Length)
-            )
+            JitMem.Copy(prolog, block)
             block
             
         let pEpilog = 
             let block = manager.Alloc(epilog.Length)
-            block.Use(fun pDst -> 
-                use src = epilog.Pin()
-                let pSrc = NativePtr.toNativeInt (NativePtr.ofVoidPtr<byte> src.Pointer)
-                JitMem.Copy(pSrc, pDst, nativeint epilog.Length)
-            )
+            JitMem.Copy(epilog, block)
             block
 
-        let fProlog = Fragment<'a>(manager, Unchecked.defaultof<'a>, pProlog)
-        let fEpilog = Fragment<'a>(manager, Unchecked.defaultof<'a>, pEpilog)
+        let fProlog = new Fragment<'a>(differential, toWriteJump, toUpdate, null, manager, Unchecked.defaultof<'a>, pProlog)
+        let fEpilog = new Fragment<'a>(differential, toWriteJump, toUpdate, fProlog, manager, Unchecked.defaultof<'a>, pEpilog)
         fProlog.Next <- fEpilog
         fEpilog.Prev <- fProlog
         fProlog.WriteJump()
         fProlog, fEpilog
 
 
-    member x.InsertAfter(ref : Fragment<'a>, tag : 'a, compile : option<'a> -> 'a -> IAssemblerStream -> unit) =
-        let ref = if isNull ref then first else ref
-        use ms = new SystemMemoryStream()
-        use ass = AssemblerStream.create ms
-        let prevTag = 
-            if ref = first then None
-            else Some ref.Tag
+    member x.InsertAfter(ref : Fragment<'a>, tag : 'a) =
+        let mutable ref = ref
+        let mutable prevTag = None
 
-        compile prevTag tag ass
-        ass.Jump(0)
+        if isNull ref then ref <- first
+        else prevTag <- Some ref.Tag
+        let next = ref.Next
 
-        let code = ms.ToMemory()
+        let code = 
+            toMemory (fun s ->
+                compile.Invoke(prevTag, tag, s)
+                s.Jump(0)
+            )
+
         let block = manager.Alloc(nativeint code.Length)
+        JitMem.Copy(code, block)
+        let frag = new Fragment<'a>(differential, toWriteJump, toUpdate, first, manager, tag, block)
 
-        block.Use (fun pDst ->
-            use src = code.Pin()
-            let pSrc = NativePtr.toNativeInt (NativePtr.ofVoidPtr<byte> src.Pointer)
-            JitMem.Copy(pSrc, pDst, nativeint code.Length)
-        )
-
-        let frag = new Fragment<'a>(manager, tag, block)
-
-        let oldNext = ref.Next
-        frag.Next <- oldNext
+        frag.Next <- next
         frag.Prev <- ref
-        oldNext.Prev <- frag
+        next.Prev <- frag
         ref.Next <- frag
-        frag.WriteJump()
-        ref.WriteJump()
+        toWriteJump.Add frag |> ignore
+        toWriteJump.Add ref |> ignore
+
+        if differential && not (Object.ReferenceEquals(next, last)) then
+            toUpdate.Add(next) |> ignore
 
         frag
 
-    member x.InsertBefore(ref : Fragment<'a>, tag : 'a, compile : option<'a> -> 'a -> IAssemblerStream -> unit) =
+    member x.InsertBefore(ref : Fragment<'a>, tag : 'a) =
         let ref = if isNull ref then last else ref
-        x.InsertAfter(ref.Prev, tag, compile)
+        x.InsertAfter(ref.Prev, tag)
 
-    member x.Append(tag : 'a, compile : option<'a> -> 'a -> IAssemblerStream -> unit) =
-        x.InsertBefore(null, tag, compile)
+    member x.Append(tag : 'a) =
+        x.InsertBefore(null, tag)
 
-    member x.Prepend(tag : 'a, compile : option<'a> -> 'a -> IAssemblerStream -> unit) =
-        x.InsertAfter(null, tag, compile)
+    member x.Prepend(tag : 'a) =
+        x.InsertAfter(null, tag)
+
+    member x.Prolog = first
+    member x.Epilog = last
+
+    member x.Dispose() =
+        if not (isNull first) then
+            first <- null
+            last <- null
+            manager.Dispose()
+            action <- Unchecked.defaultof<_>
+            pAction <- 0n
 
     member x.Run() =
+        if isNull first then raise <| ObjectDisposedException "FragmentProgram"
+
+        for u in toUpdate do u.Update(compile)
+        toUpdate.Clear()
+
+        for j in toWriteJump do j.WriteJump()
+        toWriteJump.Clear()
+
         let action = 
             lock wrapLock (fun () ->
                 let ptr = manager.Pointer + first.Offset
@@ -177,20 +217,24 @@ type FragmentProgram<'a>() =
             )
         action.Invoke()
 
+    interface IDisposable with
+        member x.Dispose() = x.Dispose()
 
+    new(compile : option<'a> -> 'a -> IAssemblerStream -> unit) = new FragmentProgram<'a>(true, compile)
+    new(compile : 'a -> IAssemblerStream -> unit) = new FragmentProgram<'a>(false, fun _ t s -> compile t s)
 
+and [<AllowNullLiteral>] Fragment<'a>(differential : bool, toWriteJump : System.Collections.Generic.HashSet<Fragment<'a>>, toUpdate : System.Collections.Generic.HashSet<Fragment<'a>>, prolog : Fragment<'a>, manager : MemoryManager, tag : 'a, ptr : managedptr) =
+    static let toMemory (action : System.IO.Stream -> IAssemblerStream -> unit) : Memory<byte> =
+        use ms = new SystemMemoryStream()
+        use ass = AssemblerStream.create ms
+        action ms ass
+        ass.Jump 0
+        ms.ToMemory()
 
-
-and [<AllowNullLiteral>] Fragment<'a>(manager : MemoryManager, tag : 'a, ptr : managedptr) =
     let mutable ptr = ptr
     let mutable prev : Fragment<'a> = null
     let mutable next : Fragment<'a> = null
 
-    static let jumpSize =
-        use ms = new SystemMemoryStream()
-        use ass = AssemblerStream.create ms
-        ass.Jump(0)
-        ms.ToMemory().Length
 
     let writeJump(offset : int) =  
         let code = 
@@ -199,72 +243,55 @@ and [<AllowNullLiteral>] Fragment<'a>(manager : MemoryManager, tag : 'a, ptr : m
             ass.Jump offset
             ms.ToMemory()
 
-        ptr.Use (fun dstPtr ->
-            let pDst = dstPtr + ptr.Size - nativeint code.Length
-            use src = code.Pin()
-            let srcPtr = src.Pointer |> NativePtr.ofVoidPtr<byte> |> NativePtr.toNativeInt
-            JitMem.Copy(srcPtr, pDst, nativeint code.Length)
-        )
+        JitMem.Copy(code, ptr, ptr.Size - nativeint code.Length)
+
 
     member x.Prev
         with get() : Fragment<'a> = prev
-        and set (p : Fragment<'a>) = prev <- p
+        and internal set (p : Fragment<'a>) = prev <- p
 
     member x.Next
         with get() : Fragment<'a> = next
-        and set (n : Fragment<'a>) = next <- n
-
+        and internal set (n : Fragment<'a>) = next <- n
 
     member x.Offset : nativeint = ptr.Offset
 
     member x.WriteJump() : unit =
-        if isNull next then writeJump 0
+        if isNull next then 
+            writeJump 0
         else 
             let ref = ptr.Offset + ptr.Size
             writeJump (int (next.Offset - ref))
 
-    // member x.Write(data : Memory<byte>) =
-    //     let size = nativeint data.Length
-    //     if size = ptr.Size then
-    //         use src = data.Pin()
-    //         let srcPtr = src.Pointer |> NativePtr.ofVoidPtr<byte> |> NativePtr.toNativeInt
-    //         ptr.Use(fun dstPtr -> JitMem.Copy(srcPtr, dstPtr, ptr.Size))
-    //     else
-    //         let n = manager.Alloc(size)
-    //         use src = data.Pin()
-    //         let srcPtr = src.Pointer |> NativePtr.ofVoidPtr<byte> |> NativePtr.toNativeInt
-    //         n.Use(fun dstPtr -> JitMem.Copy(srcPtr, dstPtr, ptr.Size))
-    //         manager.Free ptr
-    //         ptr <- n
-    //         if not (isNull prev) then prev.WriteJump()
+    member private x.Write(data : Memory<byte>) =
+        let size = nativeint data.Length
+        if size = ptr.Size then
+            JitMem.Copy(data, ptr)
+        else
+            let old = ptr
+            let n = manager.Alloc(size)
+            JitMem.Copy(data, n)
+            ptr <- n
+            if not (isNull prev) then toWriteJump.Add prev |> ignore
+            manager.Free old
 
-    //     x.WriteJump()
+        toWriteJump.Add x |> ignore
             
     member x.Tag : 'a = tag
 
-    // member x.Update(compile : option<'a> -> 'a -> IAssemblerStream -> unit) =
-    //     let prevTag = 
-    //         if isNull prev then None
-    //         else Some prev.Tag
-    //     use ms = new SystemMemoryStream()
-    //     use ass = AssemblerStream.create ms
-    //     compile prevTag tag ass
-    //     let jumpOffset = ms.Position
-    //     ass.Jump(0)
+    member internal x.Update(compile : OptimizedClosures.FSharpFunc<option<'a>, 'a, IAssemblerStream, unit>) : unit =
+        let prevTag = 
+            if Object.ReferenceEquals(prev, prolog) then None
+            else Some prev.Tag
 
-    //     let code = ms.ToMemory()
-    //     let block = manager.Alloc(nativeint code.Length)
+        let code = 
+            toMemory (fun s ass -> 
+                compile.Invoke(prevTag, tag, ass)
+                ass.Jump(0)
+            )
 
-    //     code.CopyTo(System.Span<byte>())
+        x.Write code
 
-    //     ptr.Use (fun dstPtr ->
-    //         let pDst = dstPtr + ptr.Size - nativeint code.Length
-    //         use src = code.Pin()
-    //         let srcPtr = src.Pointer |> NativePtr.ofVoidPtr<byte> |> NativePtr.toNativeInt
-    //         JitMem.Copy(srcPtr, pDst, nativeint code.Length)
-    //     )
-
-    //     x.WriteJump()
 
     member x.Dispose() =
         let p = prev
@@ -273,10 +300,14 @@ and [<AllowNullLiteral>] Fragment<'a>(manager : MemoryManager, tag : 'a, ptr : m
         n.Prev <- p
         p.Next <- n
 
-        prev <- null
-        next <- null
         manager.Free ptr
-        p.WriteJump()
+        toWriteJump.Add p |> ignore
+        if differential then
+            toUpdate.Remove x |> ignore
+            toUpdate.Add n |> ignore
+
+        toWriteJump.Remove x |> ignore
+        
 
 
 
@@ -285,30 +316,46 @@ let main _ =
     Aardvark.Init()
     let printInt = Marshal.GetFunctionPointerForDelegate print
 
-    let prog = FragmentProgram<int>()
+    let compile (prev : option<int>) (value : int) (s : IAssemblerStream) =
+        let value =
+            match prev with
+            | Some b -> b * 1000 + value
+            | None -> value
+        s.BeginCall 1
+        s.PushArg value
+        s.Call printInt
 
-    let a = 
-        prog.InsertAfter(null, 1, fun _ v s ->
-            s.BeginCall 1
-            s.PushArg v
-            s.Call printInt
-        )
+    let prog = new FragmentProgram<int>(compile)
 
-    let b = 
-        prog.InsertAfter(a, 2, fun _ v s ->
-            s.BeginCall 1
-            s.PushArg v
-            s.Call printInt
-        )
-    printfn "run"
+
+    let a = prog.Prepend(1)
+    let b = prog.InsertAfter(a, 2)
+
+    Log.start "run"
     prog.Run()
-    printfn "done"
+    Log.stop()
     
     a.Dispose()
-    printfn "run"
-    prog.Run()
-    printfn "done"
 
+
+    Log.start "run"
+    prog.Run()
+    Log.stop()
+
+    let c = prog.InsertBefore(b, 3)
+
+    Log.start "run"
+    prog.Run()
+    Log.stop()
+
+    let d = prog.InsertAfter(c, 4)
+    let e = prog.InsertAfter(null, 6)
+    
+    Log.start "run"
+    prog.Run()
+    Log.stop()
+
+    Log.line "done"
 
     exit 0
 
