@@ -66,39 +66,41 @@ let main _ =
     s.PushFloatArg (NativePtr.toNativeInt pFloat)
     s.Call(ff)
 
-    let r0 = s.ArgumentRegisters.[0]
-    let r1 = s.ArgumentRegisters.[1]
-    let r2 = s.ArgumentRegisters.[2]
-    let b = s.NewLabel()
-    s.Mark b
+    // let r0 = s.ArgumentRegisters.[0]
+    // let r1 = s.ArgumentRegisters.[1]
+    // let r2 = s.ArgumentRegisters.[2]
+    // let b = s.NewLabel()
+    // s.Mark b
 
-    s.BeginCall(1)
-    s.PushIntArg(NativePtr.toNativeInt counter)
-    s.Call printInt
+    // s.BeginCall(1)
+    // s.PushIntArg(NativePtr.toNativeInt counter)
+    // s.Call printInt
 
-    s.Set(r0, NativePtr.toNativeInt counter)
-    s.Load(r1, r0, false)
-    s.Set(r2, -1)
-    s.AddInt(r1, r2, false)
-    s.Store(r0, r1, false)
+    // s.Set(r0, NativePtr.toNativeInt counter)
+    // s.Load(r1, r0, false)
+    // s.Set(r2, -1)
+    // s.AddInt(r1, r2, false)
+    // s.Store(r0, r1, false)
 
-    s.Cmp(NativePtr.toNativeInt counter, 0)
-    s.Jump(JumpCondition.GreaterEqual, b)
+    // s.Cmp(NativePtr.toNativeInt counter, 0)
+    // s.Jump(JumpCondition.GreaterEqual, b)
 
 
-    let dst = s.NewLabel()
-    s.Cmp(NativePtr.toNativeInt counter, 0)
-    s.Jump(JumpCondition.Less, dst)
+    // let dst = s.NewLabel()
+    // s.Cmp(NativePtr.toNativeInt counter, 0)
+    // s.Jump(JumpCondition.Less, dst)
 
-    s.BeginCall(1)
-    s.PushIntArg(NativePtr.toNativeInt counter)
-    s.Call printInt
+    // s.BeginCall(1)
+    // s.PushIntArg(NativePtr.toNativeInt counter)
+    // s.Call printInt
 
-    s.Mark dst
+    // s.Mark dst
 
 
     s.EndFunction()
     s.Ret()
+
+    s.Dispose()
 
     let ptr = ExecutableMemory.Alloc (unativeint baseStream.Length)
     let code = baseStream.ToMemory()
