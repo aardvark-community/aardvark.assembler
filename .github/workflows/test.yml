@@ -26,7 +26,7 @@ jobs:
         run: dotnet bin/Debug/net6.0/Arm64.dll
   linux:
     name: Linux
-    runs-on: ubuntu-18
+    runs-on: ubuntu-18.04
     steps:  
       - name: Checkout
         uses: actions/checkout@v2
