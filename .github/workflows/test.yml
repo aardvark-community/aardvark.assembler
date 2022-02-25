@@ -23,7 +23,7 @@ jobs:
       - name: Build
         run: dotnet build Assembler.sln
       - name: Test
-        run: dotnet bin/Debug/net6.0/Demo.dll
+        run: dotnet test -l "console;verbosity=detailed" --no-build --nologo
   linux:
     name: Linux
     runs-on: ubuntu-18.04
@@ -41,7 +41,7 @@ jobs:
       - name: Build
         run: dotnet build Assembler.sln
       - name: Test
-        run: dotnet bin/Debug/net6.0/Demo.dll
+        run: dotnet test -l "console;verbosity=detailed" --no-build --nologo
   windows:
     name: Windows
     runs-on: windows-latest
@@ -59,4 +59,4 @@ jobs:
       - name: Build
         run: dotnet build Assembler.sln
       - name: Test
-        run: dotnet bin\Debug\net6.0\Demo.dll
+        run: dotnet test -l "console;verbosity=detailed" --no-build --nologo

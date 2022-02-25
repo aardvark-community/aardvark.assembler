@@ -9,6 +9,7 @@
     <Compile Include="ARM64.fs" />
     <Compile Include="AMD64.fs" />
     <Compile Include="Assembler.fs" />
+    <Compile Include="JitMem.fs" />
   </ItemGroup>
   <Import Project="..\..\.paket\Paket.Restore.targets" />
 </Project>

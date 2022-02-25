@@ -9,6 +9,8 @@ Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Demo", "src\Demo\Demo.fspro
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Aardvark.Assembler", "src\Aardvark.Assembler\Aardvark.Assembler.fsproj", "{BF373F0C-1120-41E8-8290-87FEB85EDA51}"
 EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Tests", "src\Tests\Tests.fsproj", "{2658C396-A296-4F02-990B-DFC8AD4086BA}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -26,9 +28,14 @@ Global
 		{BF373F0C-1120-41E8-8290-87FEB85EDA51}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{BF373F0C-1120-41E8-8290-87FEB85EDA51}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{BF373F0C-1120-41E8-8290-87FEB85EDA51}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2658C396-A296-4F02-990B-DFC8AD4086BA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2658C396-A296-4F02-990B-DFC8AD4086BA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2658C396-A296-4F02-990B-DFC8AD4086BA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2658C396-A296-4F02-990B-DFC8AD4086BA}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{E80A9936-F84C-423C-8880-2C6DC9CC78C5} = {5E5196E7-F656-4986-BFC5-F958C777C605}
 		{BF373F0C-1120-41E8-8290-87FEB85EDA51} = {5E5196E7-F656-4986-BFC5-F958C777C605}
+		{2658C396-A296-4F02-990B-DFC8AD4086BA} = {5E5196E7-F656-4986-BFC5-F958C777C605}
 	EndGlobalSection
 EndGlobal

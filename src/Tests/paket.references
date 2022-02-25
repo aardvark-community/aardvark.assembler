@@ -1,0 +1,7 @@
+FSharp.Core
+Aardvark.Base
+Aardvark.Base.Runtime
+Microsoft.NET.Test.Sdk
+YoloDev.Expecto.TestSdk
+Expecto
+Expecto.FsCheck

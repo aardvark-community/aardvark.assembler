@@ -20,6 +20,24 @@
                 "reveal": "always"
             },
             "problemMatcher": "$msCompile"
+        },
+        {
+            "dependsOn": [ "build" ],
+            "label": "test",
+            "command": "dotnet",
+            "type": "shell",
+            "args": [
+                "test",
+                "--logger",
+                "\"console;verbosity=detailed\"",
+                "--nologo",
+                "--no-build"
+            ],
+            "group": "build",
+            "presentation": {
+                "reveal": "always"
+            },
+            "problemMatcher": "$msCompile"
         }
     ]
 }

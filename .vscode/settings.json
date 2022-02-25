@@ -12,5 +12,6 @@
         "packages/": true,
         "paket-files/": true,
         ".vscode/*.log": true
-    }
+    },
+    "dotnet-test-explorer.testProjectPath": "*.sln"
 }
