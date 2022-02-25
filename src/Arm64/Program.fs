@@ -54,30 +54,42 @@ type JitMem private() =
         if size <= 0n then
             0n
         else
-            let ps = ExecutableMemory.PageSize
-            let effectiveSize =
-                if unativeint size % ps = 0un then unativeint size
-                else (1un + unativeint size / ps) * ps
-            ealloc effectiveSize
+            if RuntimeInformation.IsOSPlatform OSPlatform.OSX then
+                let ps = ExecutableMemory.PageSize
+                let effectiveSize =
+                    if unativeint size % ps = 0un then unativeint size
+                    else (1un + unativeint size / ps) * ps
+                ealloc effectiveSize
+            else
+                Aardvark.Base.ExecutableMemory.alloc size
 
     static member Free(ptr : nativeint, size : nativeint) =
         if size > 0n then
-            let ps = ExecutableMemory.PageSize
-            let effectiveSize =
-                if unativeint size % ps = 0un then unativeint size
-                else (1un + unativeint size / ps) * ps
-            efree(ptr, effectiveSize)
+            if RuntimeInformation.IsOSPlatform OSPlatform.OSX then
+                let ps = ExecutableMemory.PageSize
+                let effectiveSize =
+                    if unativeint size % ps = 0un then unativeint size
+                    else (1un + unativeint size / ps) * ps
+                efree(ptr, effectiveSize)
+            else
+                Aardvark.Base.ExecutableMemory.free ptr size
 
     static member Copy(src : nativeint, dst : nativeint, size : nativeint) =
         if size > 0n then
-            ecpy(dst, src, unativeint size)
-
+            if RuntimeInformation.IsOSPlatform OSPlatform.OSX then
+                ecpy(dst, src, unativeint size)
+            else
+                let vSrc = NativePtr.toVoidPtr (NativePtr.ofNativeInt<byte> src)
+                let vDst = NativePtr.toVoidPtr (NativePtr.ofNativeInt<byte> dst)
+                let sSrc = System.Span<byte>(vSrc, int size)
+                let sDst = System.Span<byte>(vDst, int size)
+                sSrc.CopyTo(sDst)
 
     static member Copy(src : Memory<byte>, dst : nativeint) =
         if src.Length > 0 then
             use hSrc = src.Pin()
             let pSrc = hSrc.Pointer |> NativePtr.ofVoidPtr<byte> |> NativePtr.toNativeInt
-            ecpy(dst, pSrc, unativeint src.Length)
+            JitMem.Copy(pSrc, dst, nativeint src.Length)
             
     static member Copy(src : Memory<byte>, dst : managedptr) =
         if src.Length > 0 then
@@ -85,7 +97,7 @@ type JitMem private() =
             dst.Use (fun pDst ->
                 use hSrc = src.Pin()
                 let pSrc = hSrc.Pointer |> NativePtr.ofVoidPtr<byte> |> NativePtr.toNativeInt
-                ecpy(pDst, pSrc, unativeint src.Length)
+                JitMem.Copy(pSrc, pDst, dst.Size)
             )
             
     static member Copy(src : Memory<byte>, dst : managedptr, dstOffset : nativeint) =
@@ -94,7 +106,7 @@ type JitMem private() =
             dst.Use (fun pDst ->
                 use hSrc = src.Pin()
                 let pSrc = hSrc.Pointer |> NativePtr.ofVoidPtr<byte> |> NativePtr.toNativeInt
-                ecpy(pDst + dstOffset, pSrc, unativeint src.Length)
+                JitMem.Copy(pSrc, pDst + dstOffset, src.Length)
             )
 
 type internal FragmentProgramState<'a> =
