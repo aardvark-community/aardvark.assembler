@@ -11,5 +11,6 @@
         ".paket": true,
         "packages/": true,
         "paket-files/": true,
+        ".vscode/*.log": true
     }
 }

@@ -22,5 +22,5 @@ endif()
 add_library(jitmem SHARED Executable.h Executable.cpp)
 target_link_libraries(jitmem pthread)
 
-SET(CMAKE_INSTALL_PREFIX "${CMAKE_CURRENT_SOURCE_DIR}/../../libs/Native/Arm64/") 
+SET(CMAKE_INSTALL_PREFIX "${CMAKE_CURRENT_SOURCE_DIR}/../../libs/Native/Aardvark.Assembler/") 
 install(TARGETS jitmem DESTINATION ${OS}/${ARCH})

@@ -1,8 +1,9 @@
-namespace Aardvark.Base.Runtime
+namespace Aardvark.Assembler
 
 open System
 open System.IO
 open System.Runtime.InteropServices
+open Aardvark.Base.Runtime
 
 module AssemblerStream =
     let create (s : Stream) =
