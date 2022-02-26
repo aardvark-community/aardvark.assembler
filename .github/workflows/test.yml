@@ -71,4 +71,4 @@ jobs:
         with:
           arch: aarch64
           distro: ubuntu18.04
-        run: uname -a
+          run: uname -a
