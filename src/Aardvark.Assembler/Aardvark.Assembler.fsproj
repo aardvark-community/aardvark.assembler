@@ -10,6 +10,7 @@
     <Compile Include="AMD64.fs" />
     <Compile Include="Assembler.fs" />
     <Compile Include="JitMem.fs" />
+    <Compile Include="FragmentProgram.fs" />
   </ItemGroup>
   <Import Project="..\..\.paket\Paket.Restore.targets" />
 </Project>
