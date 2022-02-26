@@ -92,9 +92,9 @@ module ARM64 =
                 | _ -> false
 
             member x.ArgumentSize =
-                if x.Kind &&& ArgumentKind.UInt32 <> ArgumentKind.None then 8
+                if x.Kind &&& ArgumentKind.UInt32 <> ArgumentKind.None then 4
                 elif x.Kind &&& ArgumentKind.UInt64 <> ArgumentKind.None then 8
-                elif x.Kind &&& ArgumentKind.Float <> ArgumentKind.None then 8
+                elif x.Kind &&& ArgumentKind.Float <> ArgumentKind.None then 4
                 elif x.Kind &&& ArgumentKind.Double <> ArgumentKind.None then 8
                 else failwithf "bad argument kind: %A" x.Kind
 
@@ -173,10 +173,10 @@ module ARM64 =
                 let mutable stackOffset = 0u
                 for a in arguments do
                     if a.Integral then
-                        if ii >= 8 then stackOffset <- stackOffset + 8u
+                        if ii >= 8 then stackOffset <- stackOffset + uint32 a.ArgumentSize
                         ii <- ii + 1
                     else
-                        if fi >= 8 then stackOffset <- stackOffset + 8u
+                        if fi >= 8 then stackOffset <- stackOffset + uint32 a.ArgumentSize
                         fi <- fi + 1
 
                 // SP needs to be a multiple of 16 for some reason
@@ -190,6 +190,7 @@ module ARM64 =
             if stackSpace > 0u then
                 x.sub(true, Register.SP, uint16 stackSpace, Register.SP)
 
+            
             for a in arguments do
                 if a.Integral then
                     if ii < 8 then
@@ -197,7 +198,7 @@ module ARM64 =
                         x.mov(a, reg)
                     else
                         x.store(a, Register.SP, stackOffset)
-                        stackOffset <- stackOffset + 8u
+                        stackOffset <- stackOffset + uint32 a.ArgumentSize
                     ii <- ii + 1
                 else
                     if fi < 8 then
@@ -205,7 +206,7 @@ module ARM64 =
                         x.mov(a, reg)
                     else
                         x.store(a, Register.SP, stackOffset)
-                        stackOffset <- stackOffset + 8u
+                        stackOffset <- stackOffset + uint32 a.ArgumentSize
                     fi <- fi + 1
 
 
