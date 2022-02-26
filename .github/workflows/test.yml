@@ -5,7 +5,7 @@ on:
       - master
 jobs:
   macos:
-    name: MacOS
+    name: MacOS (x64)
     runs-on: macos-11
     steps:  
       - name: Checkout
@@ -25,7 +25,7 @@ jobs:
       - name: Test
         run: dotnet test -l "console;verbosity=detailed" --no-build --nologo
   linux:
-    name: Linux
+    name: Linux (x64)
     runs-on: ubuntu-18.04
     steps:  
       - name: Checkout
@@ -43,7 +43,7 @@ jobs:
       - name: Test
         run: dotnet test -l "console;verbosity=detailed" --no-build --nologo
   windows:
-    name: Windows
+    name: Windows (x64)
     runs-on: windows-latest
     steps:  
       - name: Checkout
@@ -60,3 +60,16 @@ jobs:
         run: dotnet build Assembler.sln
       - name: Test
         run: dotnet test -l "console;verbosity=detailed" --no-build --nologo
+  linux_arm64:
+    name: Linux (arm64)
+      armv7_job:
+      runs-on: ubuntu-18.04
+      steps:
+        - uses: actions/checkout@v2.1.0
+        - uses: uraimo/run-on-arch-action@v2
+          name: Run commands
+          id: runcmd
+          with:
+            arch: aarch64
+            distro: ubuntu18.04
+          run: uname -a
