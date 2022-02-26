@@ -77,6 +77,6 @@ jobs:
             wget -q https://download.visualstudio.microsoft.com/download/pr/ad60a07c-d4f0-4225-9154-c3a2ec0f34cf/a588cd2b94db2214f6e5dcd02c4aa37a/dotnet-sdk-6.0.200-linux-arm64.tar.gz
             tar -xf dotnet-sdk-6.0.200-linux-arm64.tar.gz
             find ./sdk
-            ./sdk/dotnet tool restore
-            ./sdk/dotnet build Assembler.sln
-            ./sdk/dotnet test -l "console;verbosity=detailed" --no-build --nologo
+            ./sdk/6.0.200/dotnet tool restore
+            ./sdk/6.0.200/dotnet build Assembler.sln
+            ./sdk/6.0.200/dotnet test -l "console;verbosity=detailed" --no-build --nologo
