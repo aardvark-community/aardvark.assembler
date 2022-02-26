@@ -62,14 +62,13 @@ jobs:
         run: dotnet test -l "console;verbosity=detailed" --no-build --nologo
   linux_arm64:
     name: Linux (arm64)
-      armv7_job:
-      runs-on: ubuntu-18.04
-      steps:
-        - uses: actions/checkout@v2.1.0
-        - uses: uraimo/run-on-arch-action@v2
-          name: Run commands
-          id: runcmd
-          with:
-            arch: aarch64
-            distro: ubuntu18.04
-          run: uname -a
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@v2.1.0
+      - uses: uraimo/run-on-arch-action@v2
+        name: Run commands
+        id: runcmd
+        with:
+          arch: aarch64
+          distro: ubuntu18.04
+        run: uname -a
