@@ -135,6 +135,10 @@ module ARM64 =
 
         let jumpIndices = Dict<AssemblerLabel, Dict<int64, voption<JumpCondition>>>()
 
+        static let registerArguments =
+            if RuntimeInformation.IsOSPlatform OSPlatform.OSX then 8
+            else 7
+
         static let registers =
             Array.init 31 (fun i ->
                 Reg(sprintf "X%d" i, int Register.R0 + i)
@@ -173,10 +177,10 @@ module ARM64 =
                 let mutable stackOffset = 0u
                 for a in arguments do
                     if a.Integral then
-                        if ii >= 8 then stackOffset <- stackOffset + uint32 a.ArgumentSize
+                        if ii >= registerArguments then stackOffset <- stackOffset + uint32 a.ArgumentSize
                         ii <- ii + 1
                     else
-                        if fi >= 8 then stackOffset <- stackOffset + uint32 a.ArgumentSize
+                        if fi >= registerArguments then stackOffset <- stackOffset + uint32 a.ArgumentSize
                         fi <- fi + 1
 
                 // SP needs to be a multiple of 16 for some reason
@@ -193,7 +197,7 @@ module ARM64 =
             
             for a in arguments do
                 if a.Integral then
-                    if ii < 8 then
+                    if ii < registerArguments then
                         let reg = unbox<Register> (int Register.R0 + ii)
                         x.mov(a, reg)
                     else
@@ -201,7 +205,7 @@ module ARM64 =
                         stackOffset <- stackOffset + uint32 a.ArgumentSize
                     ii <- ii + 1
                 else
-                    if fi < 8 then
+                    if fi < registerArguments then
                         let reg = unbox<Register> (int Register.R0 + fi)
                         x.mov(a, reg)
                     else
