@@ -137,7 +137,15 @@ module ARM64 =
 
         static let registerArguments =
             if RuntimeInformation.IsOSPlatform OSPlatform.OSX then 8
-            else 7
+            else 9
+
+        static let tmp1 =
+            if RuntimeInformation.IsOSPlatform OSPlatform.OSX then Register.R8
+            else Register.R9
+
+        static let tmp2 =
+            if RuntimeInformation.IsOSPlatform OSPlatform.OSX then Register.R9
+            else Register.R10
 
         static let registers =
             Array.init 31 (fun i ->
@@ -145,7 +153,7 @@ module ARM64 =
             )
 
         static let argumentRegisters =
-            Array.take 8 registers
+            Array.take registerArguments registers
 
         static let calleeSavedRegisters =
             Array.sub registers 19 10
@@ -219,8 +227,8 @@ module ARM64 =
         member x.Call(ptr : nativeint) =    
             let stackSpace = x.PrepareArgs()
 
-            x.mov(uint64 ptr, Register.R8)
-            x.blr(Register.R8)
+            x.mov(uint64 ptr, tmp1)
+            x.blr(tmp1)
             
             if stackSpace > 0u then
                 x.add(true, Register.SP, uint16 stackSpace, Register.SP)
@@ -232,9 +240,9 @@ module ARM64 =
         member x.CallIndirect(ptr : nativeptr<nativeint>) =    
             let stackSpace = x.PrepareArgs()
 
-            x.mov(uint64 (NativePtr.toNativeInt ptr), Register.R8)
-            x.load(true, Register.R8, 0u, Register.R8)
-            x.blr(Register.R8)
+            x.mov(uint64 (NativePtr.toNativeInt ptr), tmp1)
+            x.load(true, tmp1, 0u, tmp1)
+            x.blr(tmp1)
             
             if stackSpace > 0u then
                 x.add(true, Register.SP, uint16 stackSpace, Register.SP)
@@ -487,29 +495,29 @@ module ARM64 =
                 | ArgumentKind.UInt32 -> x.mov(uint32 a.Value, dst)
                 | ArgumentKind.UInt64 -> x.mov(a.Value, dst)
                 | ArgumentKind.Float -> 
-                    x.mov(uint32 a.Value, Register.R8)
-                    x.fmov(false, Register.R8, dst)
+                    x.mov(uint32 a.Value, tmp1)
+                    x.fmov(false, tmp1, dst)
                 | ArgumentKind.Double -> 
-                    x.mov(a.Value, Register.R8)
-                    x.fmov(true, Register.R8, dst)
+                    x.mov(a.Value, tmp1)
+                    x.fmov(true, tmp1, dst)
                 | k ->  
                     failwithf "bad argument-type: %A" k
             else
-                x.mov(a.Value, Register.R8)
+                x.mov(a.Value, tmp1)
                 match a.Kind &&& ArgumentKind.TypeMask with
-                | ArgumentKind.UInt32 -> x.load(false, Register.R8, 0u, dst)
-                | ArgumentKind.UInt64 -> x.load(true, Register.R8, 0u, dst)
+                | ArgumentKind.UInt32 -> x.load(false, tmp1, 0u, dst)
+                | ArgumentKind.UInt64 -> x.load(true, tmp1, 0u, dst)
                 | ArgumentKind.Float -> 
-                    x.load(false, Register.R8, 0u, Register.R8)
-                    x.fmov(false, Register.R8, dst)
+                    x.load(false, tmp1, 0u, tmp1)
+                    x.fmov(false, tmp1, dst)
                 | ArgumentKind.Double -> 
-                    x.load(true, Register.R8, 0u, Register.R8)
-                    x.fmov(true, Register.R8, dst)
+                    x.load(true, tmp1, 0u, tmp1)
+                    x.fmov(true, tmp1, dst)
                 | k ->  
                     failwithf "bad argument-type: %A" k
 
         member private x.store(a : Argument, ptr : Register, offset : uint32) =
-            let dst = Register.R8
+            let dst = tmp1
             if a.Kind &&& ArgumentKind.Indirect = ArgumentKind.None then
                 match a.Kind with
                 | ArgumentKind.UInt32 -> 
@@ -579,10 +587,10 @@ module ARM64 =
                 x.CallIndirect ptr
 
             member x.Copy(src : nativeint, dst : nativeint, wide : bool) =
-                x.mov(uint64 src, Register.R8)
-                x.load(wide, Register.R8, 0u, Register.R9)
-                x.mov(uint64 dst, Register.R8)
-                x.store(wide, Register.R9, 0u, Register.R8)
+                x.mov(uint64 src, tmp1)
+                x.load(wide, tmp1, 0u, tmp2)
+                x.mov(uint64 dst, tmp1)
+                x.store(wide, tmp2, 0u, tmp1)
 
             member x.Mov(dst, src) =
                 x.mov(true, reg src, reg dst)
@@ -596,10 +604,10 @@ module ARM64 =
                 arguments <- null
 
             member x.Cmp(location : nativeint, value : int) : unit =
-                x.mov(uint64 location, Register.R8)
-                x.load(true, Register.R8, 0u, Register.R8)
-                x.mov(uint64 value, Register.R9)
-                x.cmp(false, Register.R8, Register.R9)
+                x.mov(uint64 location, tmp1)
+                x.load(true, tmp1, 0u, tmp1)
+                x.mov(uint64 value, tmp2)
+                x.cmp(false, tmp1, tmp2)
 
             member x.Mark(label : AssemblerLabel) =
                 let l = Unsafe.As<Arm64AssemblerLabel>(label)
