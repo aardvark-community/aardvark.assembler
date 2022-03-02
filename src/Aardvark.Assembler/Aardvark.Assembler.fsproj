@@ -11,6 +11,7 @@
     <Compile Include="Assembler.fs" />
     <Compile Include="JitMem.fs" />
     <Compile Include="FragmentProgram.fs" />
+    <Compile Include="AdaptiveFragmentProgram.fs" />
   </ItemGroup>
   <Import Project="..\..\.paket\Paket.Restore.targets" />
 </Project>

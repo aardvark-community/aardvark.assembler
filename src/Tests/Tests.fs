@@ -2,6 +2,7 @@ module AssemblerTests
 
 open System
 open Aardvark.Base
+open FSharp.Data.Adaptive
 open Expecto
 open Aardvark.Assembler
 open Microsoft.FSharp.NativeInterop
@@ -9,6 +10,7 @@ open System.Runtime.InteropServices
 open FsCheck
 
 #nowarn "9"
+open Aardvark.Base.Runtime
 
 type IntAction = delegate of int -> unit
 type NativeIntAction = delegate of nativeint -> unit
@@ -479,4 +481,153 @@ let jitMem =
             JitMem.Free(ptr, nativeint code.Length)
             Expect.equal (Seq.toList values) [(0.0f,1.0f,2.0f,3.0f,4.0f,5.0f,6.0f,7.0f,8.0f,9.0f,10.0f); (10.0f,11.0f,12.0f,13.0f,14.0f,15.0f,16.0f,17.0f,18.0f,19.0f,20.0f)] "inconsistent calls"
         }
+    ]
+
+type Operation<'a> =
+    | Insert of index : int * value : 'a
+    | Remove of index : int
+
+
+let createProgram() =
+
+    let values = System.Collections.Generic.List<int>()
+    let callback (value : int) =
+        values.Add value
+
+    let del = IntAction callback
+    let fPtr = Marshal.GetFunctionPointerForDelegate del
+
+    let compile (value : int) (ass : IAssemblerStream) =
+        ass.BeginCall(1)
+        ass.PushArg value
+        ass.Call fPtr
+
+    let prog = new FragmentProgram<int>(compile)
+
+    let run() =
+        prog.Run()
+        let res = Seq.toList values
+        values.Clear()
+        res
+    let gc = GCHandle.Alloc del
+    prog, run, { new IDisposable with member x.Dispose() = gc.Free() }
+
+[<Struct>]
+type RandomInt(value : int) =
+    member x.Value = value
+
+
+type ArbitraryModifiers() =
+    static let random = System.Random()
+
+    static member Random = random
+
+    static member RandomInt() : Arbitrary<_> =
+        Gen.fresh (fun () -> random.Next(2048) - 1024)
+        |> Gen.map RandomInt
+        |> Arb.fromGen
+        
+
+[<Tests>]
+let fragmentTests =
+    testList "FragmentTests" [
+
+        test "SimpleAddRemove" {
+            init()
+            let (prog, run, disp) = createProgram()
+            use __ = disp
+            use prog = prog
+            // Prepend
+            let a = prog.InsertAfter(null, 1)
+            Expect.equal (run()) [1] "inconsistent result"
+
+            // InsertAfter
+            let b = prog.InsertAfter(a, 2)
+            Expect.equal (run()) [1;2] "inconsistent result"
+
+            // InsertBefore
+            let c = prog.InsertBefore(a, 0)
+            Expect.equal (run()) [0;1;2] "inconsistent result"
+            
+            // Remove
+            a.Dispose()
+            Expect.equal (run()) [0;2] "inconsistent result"
+
+            // Dummy Insert & Remove
+            let d = prog.InsertAfter(c, 100)
+            d.Dispose()
+            Expect.equal (run()) [0;2] "inconsistent result"
+
+            // InsertAfter disposed
+            try 
+                prog.InsertAfter(a, 10) |> ignore
+                failwith "insert after disposed should fail"
+            with 
+                | :? ObjectDisposedException -> ()
+                | e -> failwithf "insert after disposed should fail with ObjectDisposedException but was: %A" e
+            Expect.equal (run()) [0;2] "inconsistent result"
+
+            // InsertBefore disposed
+            try 
+                prog.InsertBefore(a, 10) |> ignore
+                failwith "insert after disposed should fail"
+            with 
+                | :? ObjectDisposedException -> ()
+                | e -> failwithf "insert after disposed should fail with ObjectDisposedException but was: %A" e
+            Expect.equal (run()) [0;2] "inconsistent result"
+
+            // Append
+            let e = prog.InsertBefore(null, 3)
+            Expect.equal (run()) [0;2;3] "inconsistent result"
+
+            // Remove First
+            c.Dispose()
+            Expect.equal (run()) [2;3] "inconsistent result"
+            
+            // Remove Last
+            e.Dispose()
+            Expect.equal (run()) [2] "inconsistent result"
+            
+            // Remove All
+            b.Dispose()
+            Expect.equal (run()) [] "inconsistent result"
+
+
+        }
+
+        let config = { FsCheckConfig.defaultConfig with maxTest = 1000; endSize = 1000; arbitrary = [ typeof<ArbitraryModifiers> ] }
+        testPropertyWithConfig config "AddRemove" (fun (NonEmptyArray (arr : Operation<RandomInt>[])) ->
+            init()
+            let mutable fragments = IndexList.empty
+            let (prog, run, disp) = createProgram()
+            use __ = disp
+            use prog = prog
+            for op in arr do
+                let cnt = fragments.Count
+                match op with
+                | Insert(index, value) ->
+                    if cnt = 0 then 
+                        let f = prog.InsertAfter(null, value.Value)
+                        fragments <- IndexList.single f
+                    else
+                        let idx = ((index % cnt) + cnt) % cnt
+                        let ref = fragments.[idx]
+                        let f = prog.InsertBefore(ref, value.Value)
+                        fragments <- IndexList.insertAt idx f fragments
+                | Remove(index) ->
+                    if cnt > 0 then 
+                        let idx = ((index % cnt) + cnt) % cnt
+                        let f = fragments.[idx]
+                        f.Dispose()
+                        fragments <- IndexList.removeAt idx fragments
+                    else
+                        let value = ArbitraryModifiers.Random.Next(2048) - 1024
+                        let f = prog.InsertAfter(null, value)
+                        fragments <- IndexList.single f
+
+                let actual = run()
+                let expected = fragments |> Seq.toList |> List.map (fun f -> f.Tag)
+                Expect.equal actual expected "inconsistent result"
+        )
+
     ]

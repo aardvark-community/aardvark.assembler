@@ -3,11 +3,11 @@ open Aardvark.Base
 open System.Runtime.InteropServices
 open System.Runtime.CompilerServices
 open Microsoft.FSharp.NativeInterop
-
-#nowarn "9"
+open FSharp.Data.Adaptive
 open Aardvark.Base.Runtime
 open Aardvark.Assembler
 open System.Collections.Generic
+#nowarn "9"
 
 type IntDelegate = delegate of unit -> int
 
@@ -24,9 +24,11 @@ let print =
         Log.line "%d" a
     )
 
+
 [<EntryPoint>]
 let main _ =
     Aardvark.Init()
+
     let printInt = Marshal.GetFunctionPointerForDelegate print
 
     let compile (prev : option<int>) (value : int) (s : IAssemblerStream) =
@@ -38,57 +40,44 @@ let main _ =
         s.PushArg value
         s.Call printInt
 
-    let prog = new FragmentProgram<int>(compile)
+
+    let set = cset [1;2]
+
+    let project (value : int) =
+        [value % 2 :> obj; value :> obj]
+
+    let prog = new AdaptiveFragmentProgram<int>(set, project, compile)
+
+    // let prog = new FragmentProgram<int>(compile)
 
 
-    let a = prog.Prepend(1)
-    let b = prog.InsertAfter(a, 2)
+    // let a = prog.Prepend(1)
+    // let b = prog.InsertAfter(a, 2)
 
     Log.start "run"
     prog.Run()
     Log.stop()
     
-    a.Dispose()
+    transact (fun () -> set.Remove 1 |> ignore)
 
 
     Log.start "run"
     prog.Run()
     Log.stop()
 
-    let c = prog.InsertBefore(b, 3)
+    transact (fun () -> set.Add 3 |> ignore)
 
     Log.start "run"
     prog.Run()
     Log.stop()
 
-    let d = prog.InsertAfter(c, 4)
-    let e = prog.InsertAfter(null, 6)
     
-    Log.start "run"
-    prog.Run()
-    Log.stop()
-
-    d.Dispose()
-    e.Dispose()
-    c.Dispose()
-    b.Dispose()
-    
-    Log.start "run"
-    prog.Run()
-    Log.stop()
-
-    let x = prog.Prepend 2
-    let y = prog.Prepend 1
+    transact (fun () -> set.UnionWith [4;5;6] |> ignore)
 
     Log.start "run"
     prog.Run()
     Log.stop()
 
-    prog.Clear()
-    
-    Log.start "run"
-    prog.Run()
-    Log.stop()
 
     Log.line "done"
 

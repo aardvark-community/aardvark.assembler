@@ -1,4 +1,5 @@
+open Expecto.Tests
 
 [<EntryPoint>]
-let main _ = 
-    0
+let main argv = 
+    runTestsInAssemblyWithCLIArgs [] argv

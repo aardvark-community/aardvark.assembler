@@ -18,7 +18,7 @@ type internal FragmentProgramState<'a> =
         mutable epilog : Fragment<'a>
     }
 
-and FragmentProgram<'a> private(differential : bool, compile : option<'a> -> 'a -> IAssemblerStream -> unit) =
+and FragmentProgram<'a> internal(differential : bool, compile : option<'a> -> 'a -> IAssemblerStream -> unit) =
     static let initialCapacity = 64n <<< 10
     static let config = 
         {
@@ -80,8 +80,8 @@ and FragmentProgram<'a> private(differential : bool, compile : option<'a> -> 'a 
         fProlog.WriteJump()
         fProlog, fEpilog
 
-
     member x.InsertAfter(ref : Fragment<'a>, tag : 'a) =
+        if not (isNull ref) && ref.IsDisposed then raise <| ObjectDisposedException "FragmentProgram.InsertAfter reference is disposed" 
         let mutable ref = ref
         let mutable prevTag = None
 
@@ -112,6 +112,7 @@ and FragmentProgram<'a> private(differential : bool, compile : option<'a> -> 'a 
         frag
 
     member x.InsertBefore(ref : Fragment<'a>, tag : 'a) =
+        if not (isNull ref) && ref.IsDisposed then raise <| ObjectDisposedException "FragmentProgram.InsertBefore reference is disposed" 
         let ref = if isNull ref then last else ref
         x.InsertAfter(ref.Prev, tag)
 
@@ -182,6 +183,7 @@ and [<AllowNullLiteral>] Fragment<'a> internal(state : FragmentProgramState<'a>,
     let mutable next : Fragment<'a> = null
 
 
+
     let writeJump(offset : int) =  
         let code = 
             use ms = new SystemMemoryStream()
@@ -199,6 +201,8 @@ and [<AllowNullLiteral>] Fragment<'a> internal(state : FragmentProgramState<'a>,
     member x.Next
         with get() : Fragment<'a> = next
         and internal set (n : Fragment<'a>) = next <- n
+
+    member x.IsDisposed : bool = ptr.Free
 
     member x.Offset : nativeint = ptr.Offset
 
