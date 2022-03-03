@@ -19,6 +19,8 @@ type FloatAction = delegate of float -> unit
 type ManyArgs = delegate of int * int * int * int * int * int * int * int * int * int * int -> unit
 type ManyFloats = delegate of float32 * float32 * float32 * float32 * float32 * float32 * float32 * float32 * float32 * float32 * float32 -> unit
 
+type ManyMixed = delegate of int * float32 * nativeint * float32 * int * int * float32 * float32 * int * float32 * int -> unit
+
 
 
 let init() =
@@ -446,6 +448,63 @@ let jitMem =
 
             JitMem.Free(ptr, nativeint code.Length)
             Expect.equal (Seq.toList values) [(0.0f,1.0f,2.0f,3.0f,4.0f,5.0f,6.0f,7.0f,8.0f,9.0f,10.0f); (10.0f,11.0f,12.0f,13.0f,14.0f,15.0f,16.0f,17.0f,18.0f,19.0f,20.0f)] "inconsistent calls"
+        }
+
+
+        
+        test "ManyMixed" {
+            let values = System.Collections.Generic.List<_>()
+            let del = ManyMixed (fun a b c d e f g h i j k -> values.Add(a,b,c,d,e,f,g,h,i,j,k))
+            let pAction = Marshal.GetFunctionPointerForDelegate del
+
+        
+            let code =
+                use ms = new SystemMemoryStream()
+                use ass = AssemblerStream.create ms
+
+                ass.BeginFunction()
+                //  delegate of int * float32 * nativeint * float32 * int * int * float32 * float32 * int * float32 * int -> unit
+                ass.BeginCall(11)
+                ass.PushArg 10
+                ass.PushArg 9.0f
+                ass.PushArg 8
+                ass.PushArg 7.0f
+                ass.PushArg 6.0f
+                ass.PushArg 5
+                ass.PushArg 4
+                ass.PushArg 3.0f
+                ass.PushArg 2n
+                ass.PushArg 1.0f
+                ass.PushArg 0
+                ass.Call pAction
+
+                
+                ass.BeginCall(11)
+                ass.PushArg 20
+                ass.PushArg 19.0f
+                ass.PushArg 18
+                ass.PushArg 17.0f
+                ass.PushArg 16.0f
+                ass.PushArg 15
+                ass.PushArg 14
+                ass.PushArg 13.0f
+                ass.PushArg 12n
+                ass.PushArg 11.0f
+                ass.PushArg 10
+                ass.Call pAction
+
+                ass.EndFunction()
+                ass.Ret()
+                ms.ToMemory()
+
+            let ptr = JitMem.Alloc(nativeint code.Length)
+            JitMem.Copy(code, ptr)
+
+            let action = Marshal.GetDelegateForFunctionPointer<Action>(ptr)
+            action.Invoke()
+
+            JitMem.Free(ptr, nativeint code.Length)
+            Expect.equal (Seq.toList values) [(0,1.0f,2n,3.0f,4,5,6.0f,7.0f,8,9.0f,10); (10,11.0f,12n,13.0f,14,15,16.0f,17.0f,18,19.0f,20)] "inconsistent calls"
         }
     ]
 
