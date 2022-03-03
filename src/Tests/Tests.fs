@@ -512,9 +512,101 @@ let createProgram() =
     let gc = GCHandle.Alloc del
     prog, run, { new IDisposable with member x.Dispose() = gc.Free() }
 
+
+module Delegate =
+    open System.Reflection
+    open System.Reflection.Emit
+    
+    module internal DelegateBuilder = 
+        let assembly = new AssemblyName();
+        assembly.Version <- new Version(1, 0, 0, 0);
+        assembly.Name <- "ReflectionEmitDelegateTest";
+        let assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(assembly, AssemblyBuilderAccess.Run)
+        let modbuilder = assemblyBuilder.DefineDynamicModule("MyModule")
+
+        let mutable delegateIndex = 0
+        let buildDelegate (argTypes : Type[]) (ret : Type) =
+            let delegateIndex = System.Threading.Interlocked.Increment(&delegateIndex)
+            let name = sprintf "DelegateType%d" delegateIndex
+
+            let typeBuilder = modbuilder.DefineType(
+                                name, 
+                                TypeAttributes.Class ||| TypeAttributes.Public ||| TypeAttributes.Sealed, 
+                                typeof<System.MulticastDelegate>)
+
+    
+
+            let constructorBuilder = typeBuilder.DefineConstructor(MethodAttributes.Public, CallingConventions.Standard, [| typeof<obj>; typeof<System.IntPtr> |])
+            constructorBuilder.SetImplementationFlags(MethodImplAttributes.Runtime ||| MethodImplAttributes.Managed);
+
+            let methodBuilder = typeBuilder.DefineMethod("Invoke", MethodAttributes.Public, ret, argTypes);
+            methodBuilder.SetImplementationFlags(MethodImplAttributes.Runtime ||| MethodImplAttributes.Managed);
+
+            typeBuilder.CreateType()
+
+    let createNAry (args : Type[]) (action : obj[] -> 'b) =
+        let n = args.Length
+
+        let ret = 
+            if typeof<'b> = typeof<unit> then typeof<System.Void>
+            else typeof<'b>
+
+
+        let typ =   
+            DelegateBuilder.buildDelegate args ret
+
+        let bType = 
+            DelegateBuilder.modbuilder.DefineType(typ.Name + "Dispatcher", TypeAttributes.Class ||| TypeAttributes.Public ||| TypeAttributes.Sealed, typeof<obj>)
+
+        let f = bType.DefineField("action", typeof<obj[] -> 'b>, FieldAttributes.Public)
+
+        let bCtor = bType.DefineConstructor(MethodAttributes.Public, CallingConventions.Standard, [| typeof<obj[] -> 'b> |])
+        let il = bCtor.GetILGenerator()
+        il.Emit(OpCodes.Ldarg_0)
+        il.Emit(OpCodes.Ldarg_1)
+        il.Emit(OpCodes.Stfld, f)
+        il.Emit(OpCodes.Ret)
+
+        let bRun = bType.DefineMethod("Run", MethodAttributes.Final ||| MethodAttributes.Public, ret, args)
+        let il = bRun.GetILGenerator()
+        let arr = il.DeclareLocal typeof<obj[]>
+        il.Emit(OpCodes.Ldc_I4, n)
+        il.Emit(OpCodes.Newarr, typeof<obj>)
+        il.Emit(OpCodes.Stloc, arr)
+
+        for i in 0 .. n - 1 do
+            let t = args.[i]
+            il.Emit(OpCodes.Ldloc, arr)
+            il.Emit(OpCodes.Ldc_I4, i)
+            il.Emit(OpCodes.Ldarg, i+1)
+            if t.IsValueType then il.Emit(OpCodes.Box, t)
+            il.Emit(OpCodes.Stelem, typeof<obj>)
+
+        il.Emit(OpCodes.Ldarg_0)
+        il.Emit(OpCodes.Ldfld, f)
+        il.Emit(OpCodes.Ldloc, arr)
+        il.EmitCall(OpCodes.Callvirt, typeof<obj[] -> 'b>.GetMethod "Invoke", null)
+        if typeof<'b> = typeof<unit> then il.Emit(OpCodes.Pop)
+        il.Emit(OpCodes.Ret)
+        
+        let tt = bType.CreateType()
+        let o = Activator.CreateInstance(tt, action)
+        Delegate.CreateDelegate(typ, o, "Run")
+
 [<Struct>]
 type RandomInt(value : int) =
     member x.Value = value
+
+type Argument =
+    | Int of value : int
+    | IntRef of int
+    | Float of NormalFloat
+    | FloatRef of NormalFloat
+
+    member x.Type =
+        match x with
+        | Int _ | IntRef _ -> typeof<int>
+        | Float _ | FloatRef _ -> typeof<float32>
 
 
 type ArbitraryModifiers() =
@@ -630,4 +722,99 @@ let fragmentTests =
                 Expect.equal actual expected "inconsistent result"
         )
 
+        let config = { FsCheckConfig.defaultConfig with maxTest = 1000; endSize = 1000; arbitrary = [ typeof<ArbitraryModifiers> ] }
+        testPropertyWithConfig config "NAry" (fun (NonEmptyArray (arr : Operation<option<Argument> * option<Argument> * option<Argument> * option<Argument> * option<Argument> * list<Argument>>[])) ->
+            init()
+            let calls = System.Collections.Generic.List()
+            let delegates = Dict<list<Type>, PinnedDelegate>()
+
+            let mem = Marshal.AllocHGlobal (1 <<< 20)
+            try
+                let mutable current = mem
+
+                let compile (args : list<Argument>) (ass : IAssemblerStream)=
+                    let types = args |> List.map (fun a -> a.Type)
+                    let del = 
+                        delegates.GetOrCreate(types, fun types ->
+                            let del = 
+                                Delegate.createNAry (List.toArray types) (fun args ->
+                                    calls.Add args
+                                )
+                            Marshal.PinDelegate del
+                        )
+
+                    ass.BeginCall(List.length args)
+                    for a in List.rev args do
+                        match a with
+                        | Int v -> ass.PushArg v
+                        | IntRef v -> 
+                            NativePtr.write (NativePtr.ofNativeInt<int> current) v
+                            ass.PushIntArg current
+                            current <- current + 8n
+                        | Float (NormalFloat v) -> ass.PushArg (float32 v)
+                        | FloatRef (NormalFloat v)-> 
+                            NativePtr.write (NativePtr.ofNativeInt<float32> current) (float32 v)
+                            ass.PushFloatArg current
+                            current <- current + 8n
+                    ass.Call(del.Pointer)
+
+                use prog = new FragmentProgram<_>(compile)
+                let run() =
+                    prog.Run()
+                    let result = calls |> Seq.map (fun a -> Array.toList a) |> Seq.toList
+                    calls.Clear()
+                    result
+
+                let toList (a, b, c, d, e, f) =
+                    Option.toList a @ Option.toList b @ Option.toList c @ Option.toList d @ Option.toList e @ f
+
+                let arr =
+                    arr |> Array.map (function
+                        | Insert(index, value) -> Insert(index, toList value)
+                        | Remove index -> Remove index
+                    )
+
+                let mutable fragments = IndexList.empty
+                for op in arr do
+                    let cnt = fragments.Count
+                    match op with
+                    | Insert(index, value) ->
+                        if cnt = 0 then 
+                            let f = prog.InsertAfter(null, value)
+                            fragments <- IndexList.single f
+                        else
+                            let idx = ((index % cnt) + cnt) % cnt
+                            let ref = fragments.[idx]
+                            let f = prog.InsertBefore(ref, value)
+                            fragments <- IndexList.insertAt idx f fragments
+                    | Remove(index) ->
+                        if cnt > 0 then 
+                            let idx = ((index % cnt) + cnt) % cnt
+                            let f = fragments.[idx]
+                            f.Dispose()
+                            fragments <- IndexList.removeAt idx fragments
+
+
+                    let toObj (a : Argument) =
+                        match a with
+                        | Int v -> v :> obj
+                        | IntRef v -> v :> obj
+                        | Float (NormalFloat v) -> float32 v :> obj
+                        | FloatRef (NormalFloat v) -> float32 v :> obj
+
+                    let actual = run()
+                    let expected = fragments |> Seq.toList |> List.map (fun f -> f.Tag |> List.map toObj)
+                    Expect.equal actual expected "inconsistent result"
+                ()
+            finally
+                Marshal.FreeHGlobal mem
+        
+            // if delegates.Count > 0 then
+            //     let args = delegates |> Dict.toSeq |> Seq.map (fun (k,_) -> List.length k) |> Set.ofSeq
+
+            //     let mutable ranges = RangeSet.empty
+            //     for i in args do ranges <- RangeSet.insert (Range1i(i,i)) ranges
+
+            //     printfn "%0A arguments" ranges
+        )
     ]
