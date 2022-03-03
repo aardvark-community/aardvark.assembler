@@ -299,40 +299,6 @@ let jitMem =
                 Expect.equal (Seq.toList values) [1.23f; 3.21f] "inconsistent calls"
         }
 
-        // test "DirectFloat64" {
-        //     init()
-
-        //     let values = System.Collections.Generic.List<float>()
-        //     let action = FloatAction values.Add
-        //     let pAction = Marshal.GetFunctionPointerForDelegate action
-
-        //     let code =
-        //         use ms = new SystemMemoryStream()
-        //         use ass = AssemblerStream.create ms
-
-        //         ass.BeginFunction()
-
-        //         ass.BeginCall(1)
-        //         ass.PushArg 1.23
-        //         ass.Call pAction
-                
-        //         ass.BeginCall(1)
-        //         ass.PushArg 3.21
-        //         ass.Call pAction
-
-        //         ass.EndFunction()
-        //         ass.Ret()
-        //         ms.ToMemory()
-
-        //     let ptr = JitMem.Alloc(nativeint code.Length)
-        //     JitMem.Copy(code, ptr)
-
-        //     let action = Marshal.GetDelegateForFunctionPointer<Action>(ptr)
-        //     action.Invoke()
-
-        //     JitMem.Free(ptr, nativeint code.Length)
-        //     Expect.equal (Seq.toList values) [1.23; 3.21] "inconsistent calls"
-        // }
         
         test "IndirectFloat64" {
             init()

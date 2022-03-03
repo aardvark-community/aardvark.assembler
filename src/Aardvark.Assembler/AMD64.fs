@@ -724,11 +724,15 @@ module AMD64 =
             paddingPtr <- ptr :: paddingPtr
             argumentOffset <- 0
             argumentIndex <- args - 1
+            arguments <- Array.zeroCreate args
 
         member private x.PrepareArguments(cc : CallingConvention) =
             if not (RuntimeInformation.IsOSPlatform OSPlatform.Windows) then
                 let mutable ii = 0
                 let mutable fi = 0
+
+                let stack = System.Collections.Generic.List<Argument>()
+
 
                 for a in arguments do
                     let indirect = a.Kind &&& ArgumentKind.Indirect <> ArgumentKind.None
@@ -738,20 +742,14 @@ module AMD64 =
                             if indirect then x.Load(cc.registers[ii], nativeint a.Value, false)
                             else x.Mov(cc.registers[ii], uint32 a.Value)
                         else 
-                            if indirect then x.Load(Register.Rax, nativeint a.Value, false)
-                            else x.Mov(Register.Rax, uint32 a.Value)
-                            x.Push(Register.Rax)
-                            argumentOffset <- argumentOffset + 8
+                            stack.Add a
                         ii <- ii + 1
                     | ArgumentKind.UInt64 ->
                         if ii < cc.registers.Length then 
                             if indirect then x.Load(cc.registers[ii], nativeint a.Value, true)
                             else x.Mov(cc.registers[ii], a.Value)
                         else 
-                            if indirect then x.Load(Register.Rax, nativeint a.Value, true)
-                            else x.Mov(Register.Rax, a.Value)
-                            x.Push(Register.Rax)
-                            argumentOffset <- argumentOffset + 8
+                            stack.Add a
                         ii <- ii + 1
                     | ArgumentKind.Float ->
                         if fi < cc.floatRegisters.Length then 
@@ -759,10 +757,7 @@ module AMD64 =
                             else x.Mov(Register.Rax, uint32 a.Value)
                             x.Mov(cc.floatRegisters.[fi], Register.Rax, false)
                         else
-                            if indirect then x.Load(Register.Rax, nativeint a.Value, false)
-                            else x.Mov(Register.Rax, uint32 a.Value)
-                            x.Push Register.Rax
-                            argumentOffset <- argumentOffset + 8
+                            stack.Add a
                         fi <- fi + 1
                     | ArgumentKind.Double ->
                         if fi < cc.floatRegisters.Length then 
@@ -770,13 +765,31 @@ module AMD64 =
                             else x.Mov(Register.Rax, a.Value)
                             x.Mov(cc.floatRegisters.[fi], Register.Rax, true)
                         else
-                            if indirect then x.Load(Register.Rax, nativeint a.Value, true)
-                            else x.Mov(Register.Rax, a.Value)
-                            x.Push Register.Rax
-                            argumentOffset <- argumentOffset + 8
+                            stack.Add a
                         fi <- fi + 1
                     | _ ->
                         failwith "not implemented"
+
+                for i in 1 .. stack.Count do
+                    let i = stack.Count - i
+                    let a = stack.[i]
+                    let indirect = a.Kind &&& ArgumentKind.Indirect <> ArgumentKind.None
+                    match a.Kind &&& ArgumentKind.TypeMask with
+                    | ArgumentKind.UInt32 | ArgumentKind.Float ->
+                        if indirect then x.Load(Register.Rax, nativeint a.Value, false)
+                        else x.Mov(Register.Rax, uint32 a.Value)
+                        x.Push(Register.Rax)
+                        argumentOffset <- argumentOffset + 8
+
+                    | ArgumentKind.UInt64 | ArgumentKind.Double ->
+                        if indirect then x.Load(Register.Rax, nativeint a.Value, true)
+                        else x.Mov(Register.Rax, a.Value)
+                        x.Push(Register.Rax)
+                        argumentOffset <- argumentOffset + 8
+                    | _ ->
+                        failwith "bad argument"
+
+                arguments <- null
 
         member x.Call(cc : CallingConvention, load : Register -> unit) =
             x.PrepareArguments(cc)
@@ -900,7 +913,7 @@ module AMD64 =
                     x.Push(Register.Rax)
             else
                 let i = dec &argumentIndex
-                arguments.[i] <- if wide then Argument.FloatPtr (NativePtr.ofNativeInt location) else Argument.DoublePtr (NativePtr.ofNativeInt location)
+                arguments.[i] <- if wide then Argument.DoublePtr (NativePtr.ofNativeInt location) else Argument.FloatPtr (NativePtr.ofNativeInt location)
 
 
         member private x.Dispose(disposing : bool) =
