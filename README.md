@@ -5,3 +5,4 @@
 Provides APIs for:
 * simple native-code generation via `IAssemblerStream`
 * *Fragment* based API for dynamic programs via `FragmentProgram<'a>`
+* `AdaptiveFragmentProgram` for automatically grouping and compiling `aset<'a>`
