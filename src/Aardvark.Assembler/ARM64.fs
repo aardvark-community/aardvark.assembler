@@ -108,15 +108,6 @@ module ARM64 =
             static member FloatPtr(value : nativeptr<float32>) = { Kind = ArgumentKind.Indirect ||| ArgumentKind.Float; Value = uint64 (NativePtr.toNativeInt value) }
             static member DoublePtr(value : nativeptr<float>) = { Kind = ArgumentKind.Indirect ||| ArgumentKind.Double; Value = uint64 (NativePtr.toNativeInt value) }
 
-    // type Arm64Label() =
-    //     let mutable index = -1
-
-    //     member x.Position
-    //         with get() = 4L * int64 index
-    //         and internal set (v : int64) = index <- int (v / 4L)
-
-    //     interface AssemblerLabel with
-    //         member x.Position = x.Position
     type Arm64AssemblerLabel internal() =
         let mutable position = -1L
 
@@ -126,8 +117,6 @@ module ARM64 =
 
     type Arm64Stream(baseStream : Stream, leaveOpen : bool) =
         let writer = new BinaryWriter(baseStream, System.Text.Encoding.UTF8, leaveOpen)
-        // let mutable data = Array.zeroCreate<uint32> 16
-        // let mutable count = 0
 
         let mutable totalArgs = 0
         let mutable argCount = 0

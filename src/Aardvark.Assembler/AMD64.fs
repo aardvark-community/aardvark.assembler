@@ -162,7 +162,68 @@ module AMD64 =
     let private returnRegister = registers.[0]
 
     // Register.R12; Register.R13; Register.R14; Register.R15
-    
+
+ 
+    module private Bitwise =
+        [<MethodImpl(MethodImplOptions.NoInlining)>]
+        let float32Bits (v : float32) =
+            let ptr = NativePtr.stackalloc 1
+            NativePtr.write ptr v
+            NativePtr.read (NativePtr.ofNativeInt<uint32> (NativePtr.toNativeInt ptr))
+            
+        [<MethodImpl(MethodImplOptions.NoInlining)>]
+        let floatBits (v : float) =
+            let ptr = NativePtr.stackalloc 1
+            NativePtr.write ptr v
+            NativePtr.read (NativePtr.ofNativeInt<uint64> (NativePtr.toNativeInt ptr))
+
+
+    [<AutoOpen>]
+    module private Amd64Arguments =
+        type Reg = Aardvark.Base.Runtime.Register
+
+        let inline reg (r : Reg) = unbox<Register> r.Tag
+
+        [<Flags>]
+        type ArgumentKind =
+            | None = 0
+            | UInt32 = 1
+            | UInt64 = 2
+            | Float = 4
+            | Double = 8
+            | Indirect = 0x10
+
+            | TypeMask = 0xF
+            
+        [<Struct>]
+        type Argument =
+            {
+                Kind    : ArgumentKind
+                Value   : uint64
+            }
+
+            member x.Integral =
+                match x.Kind &&& ArgumentKind.TypeMask with
+                | ArgumentKind.UInt32 | ArgumentKind.UInt64 -> true
+                | _ -> false
+
+            member x.ArgumentSize =
+                if x.Kind &&& ArgumentKind.UInt32 <> ArgumentKind.None then 4
+                elif x.Kind &&& ArgumentKind.UInt64 <> ArgumentKind.None then 8
+                elif x.Kind &&& ArgumentKind.Float <> ArgumentKind.None then 4
+                elif x.Kind &&& ArgumentKind.Double <> ArgumentKind.None then 8
+                else failwithf "bad argument kind: %A" x.Kind
+
+            static member UInt32(value : uint32) = { Kind = ArgumentKind.UInt32; Value = uint64 value }
+            static member UInt64(value : uint64) = { Kind = ArgumentKind.UInt64; Value = value }
+            static member Float(value : float32) = { Kind = ArgumentKind.Float; Value = uint64 (Bitwise.float32Bits value) }
+            static member Double(value : float) = { Kind = ArgumentKind.Double; Value = Bitwise.floatBits value }
+
+            static member UInt32Ptr(value : nativeptr<uint32>) = { Kind = ArgumentKind.Indirect ||| ArgumentKind.UInt32; Value = uint64 (NativePtr.toNativeInt value) }
+            static member UInt64Ptr(value : nativeptr<uint64>) = { Kind = ArgumentKind.Indirect ||| ArgumentKind.UInt64; Value = uint64 (NativePtr.toNativeInt value) }
+            static member FloatPtr(value : nativeptr<float32>) = { Kind = ArgumentKind.Indirect ||| ArgumentKind.Float; Value = uint64 (NativePtr.toNativeInt value) }
+            static member DoublePtr(value : nativeptr<float>) = { Kind = ArgumentKind.Indirect ||| ArgumentKind.Double; Value = uint64 (NativePtr.toNativeInt value) }
+ 
     type AssemblerStream(stream : Stream, leaveOpen : bool) =
         let writer = new BinaryWriter(stream, Text.Encoding.UTF8, leaveOpen)
 
@@ -175,6 +236,8 @@ module AMD64 =
         let mutable paddingPtr = []
         let mutable argumentOffset = 0
         let mutable argumentIndex = 0
+
+        let mutable arguments : Argument[] = null
 
         static let push             = [| 0x48uy; 0x89uy; 0x44uy; 0x24uy |]
         static let callRax          = [| 0xFFuy; 0xD0uy |]
@@ -662,108 +725,182 @@ module AMD64 =
             argumentOffset <- 0
             argumentIndex <- args - 1
 
-        member x.Call(cc : CallingConvention, r : Register) =
-            if r >= Register.XMM0 then
-                failwith "cannot call media register"
-            else
+        member private x.PrepareArguments(cc : CallingConvention) =
+            if not (RuntimeInformation.IsOSPlatform OSPlatform.Windows) then
+                let mutable ii = 0
+                let mutable fi = 0
 
-                let paddingPtr =
-                    match paddingPtr with
-                        | h :: rest ->
-                            paddingPtr <- rest
-                            h
-                        | _ ->
-                            failwith "no padding offset"
+                for a in arguments do
+                    let indirect = a.Kind &&& ArgumentKind.Indirect <> ArgumentKind.None
+                    match a.Kind &&& ArgumentKind.TypeMask with
+                    | ArgumentKind.UInt32 ->
+                        if ii < cc.registers.Length then 
+                            if indirect then x.Load(cc.registers[ii], nativeint a.Value, false)
+                            else x.Mov(cc.registers[ii], uint32 a.Value)
+                        else 
+                            if indirect then x.Load(Register.Rax, nativeint a.Value, false)
+                            else x.Mov(Register.Rax, uint32 a.Value)
+                            x.Push(Register.Rax)
+                            argumentOffset <- argumentOffset + 8
+                        ii <- ii + 1
+                    | ArgumentKind.UInt64 ->
+                        if ii < cc.registers.Length then 
+                            if indirect then x.Load(cc.registers[ii], nativeint a.Value, true)
+                            else x.Mov(cc.registers[ii], a.Value)
+                        else 
+                            if indirect then x.Load(Register.Rax, nativeint a.Value, true)
+                            else x.Mov(Register.Rax, a.Value)
+                            x.Push(Register.Rax)
+                            argumentOffset <- argumentOffset + 8
+                        ii <- ii + 1
+                    | ArgumentKind.Float ->
+                        if fi < cc.floatRegisters.Length then 
+                            if indirect then x.Load(Register.Rax, nativeint a.Value, false)
+                            else x.Mov(Register.Rax, uint32 a.Value)
+                            x.Mov(cc.floatRegisters.[fi], Register.Rax, false)
+                        else
+                            if indirect then x.Load(Register.Rax, nativeint a.Value, false)
+                            else x.Mov(Register.Rax, uint32 a.Value)
+                            x.Push Register.Rax
+                            argumentOffset <- argumentOffset + 8
+                        fi <- fi + 1
+                    | ArgumentKind.Double ->
+                        if fi < cc.floatRegisters.Length then 
+                            if indirect then x.Load(Register.Rax, nativeint a.Value, true)
+                            else x.Mov(Register.Rax, a.Value)
+                            x.Mov(cc.floatRegisters.[fi], Register.Rax, true)
+                        else
+                            if indirect then x.Load(Register.Rax, nativeint a.Value, true)
+                            else x.Mov(Register.Rax, a.Value)
+                            x.Push Register.Rax
+                            argumentOffset <- argumentOffset + 8
+                        fi <- fi + 1
+                    | _ ->
+                        failwith "not implemented"
 
-                let additional = 
-                    if stackOffset % 16 <> 0 then
-                        let p = stream.Position
-                        stream.Position <- paddingPtr
-                        writer.Write(8u)
-                        stream.Position <- p
-                        8u
-                    else
-                        0u
+        member x.Call(cc : CallingConvention, load : Register -> unit) =
+            x.PrepareArguments(cc)
 
-                if cc.shadowSpace then
-                    x.Sub(Register.Rsp, 8u * uint32 cc.registers.Length)
+            let paddingPtr =
+                match paddingPtr with
+                | h :: rest ->
+                    paddingPtr <- rest
+                    h
+                | _ ->
+                    failwith "no padding offset"
 
-                let r = byte r
-                if r >= 8uy then
-                    writer.Write(0x41uy)
-                    writer.Write(0xFFuy)
-                    writer.Write(0xD0uy + (r - 8uy))
-
+            let additional = 
+                if stackOffset % 16 <> 0 then
+                    let p = stream.Position
+                    stream.Position <- paddingPtr
+                    writer.Write(8u)
+                    stream.Position <- p
+                    8u
                 else
-                    writer.Write(0xFFuy)
-                    writer.Write(0xD0uy + r)
-                    
-                let popSize =
-                    (if cc.shadowSpace then 8u * uint32 cc.registers.Length else 0u) +
-                    uint32 argumentOffset +
-                    additional
+                    0u
 
-                if popSize > 0u then
-                    x.Add(Register.Rsp, popSize)
+            if cc.shadowSpace then
+                x.Sub(Register.Rsp, 8u * uint32 cc.registers.Length)
 
-                stackOffset <- stackOffset - argumentOffset
-                argumentOffset <- 0
+            load Register.Rax
+            let r = byte Register.Rax
+            if r >= 8uy then
+                writer.Write(0x41uy)
+                writer.Write(0xFFuy)
+                writer.Write(0xD0uy + (r - 8uy))
 
-        member x.Call(cc : CallingConvention, ptr : nativeint) =
-            x.Mov(Register.Rax, ptr)
-            x.Call(cc, Register.Rax)
+            else
+                writer.Write(0xFFuy)
+                writer.Write(0xD0uy + r)
+                
+            let popSize =
+                (if cc.shadowSpace then 8u * uint32 cc.registers.Length else 0u) +
+                uint32 argumentOffset +
+                additional
 
+            if popSize > 0u then
+                x.Add(Register.Rsp, popSize)
+
+            stackOffset <- stackOffset - argumentOffset
+            argumentOffset <- 0
 
         member x.Ret() =
             writer.Write(0xC3uy)
 
         member x.PushArg(cc : CallingConvention, value : uint64) =
-            let i = dec &argumentIndex
-            if i < cc.registers.Length then
-                x.Mov(cc.registers.[i], value)
+            if RuntimeInformation.IsOSPlatform OSPlatform.Windows then
+                let i = dec &argumentIndex
+                if i < cc.registers.Length then
+                    x.Mov(cc.registers.[i], value)
+                else
+                    argumentOffset <- argumentOffset + 8
+                    x.Push(value)
             else
-                argumentOffset <- argumentOffset + 8
-                x.Push(value)
+                let i = dec &argumentIndex
+                arguments.[i] <- Argument.UInt64 value
 
          member x.PushArg(cc : CallingConvention, value : uint32) =
-            let i = dec &argumentIndex
-            if i < cc.registers.Length then
-                x.Mov(cc.registers.[i], value)
+            if RuntimeInformation.IsOSPlatform OSPlatform.Windows then
+                let i = dec &argumentIndex
+                if i < cc.registers.Length then
+                    x.Mov(cc.registers.[i], value)
+                else
+                    argumentOffset <- argumentOffset + 8
+                    x.Push(value)   
             else
-                argumentOffset <- argumentOffset + 8
-                x.Push(value)    
+                let i = dec &argumentIndex
+                arguments.[i] <- Argument.UInt32 value 
 
          member x.PushArg(cc : CallingConvention, value : float32) =
-            let i = dec &argumentIndex
-            if i < cc.floatRegisters.Length then
-                x.Mov(cc.floatRegisters.[i], value)
+            if RuntimeInformation.IsOSPlatform OSPlatform.Windows then
+                let i = dec &argumentIndex
+                if i < cc.floatRegisters.Length then
+                    x.Mov(cc.floatRegisters.[i], value)
+                else
+                    argumentOffset <- argumentOffset + 8
+                    x.Push(value)  
             else
-                argumentOffset <- argumentOffset + 8
-                x.Push(value)  
+                let i = dec &argumentIndex
+                arguments.[i] <- Argument.Float value 
 
          member x.PushArg(cc : CallingConvention, value : float) =
-            let i = dec &argumentIndex
-            if i < cc.floatRegisters.Length then
-                x.Mov(cc.floatRegisters.[i], value)
+            if RuntimeInformation.IsOSPlatform OSPlatform.Windows then
+                let i = dec &argumentIndex
+                if i < cc.floatRegisters.Length then
+                    x.Mov(cc.floatRegisters.[i], value)
+                else
+                    argumentOffset <- argumentOffset + 8
+                    x.Push(value)  
             else
-                argumentOffset <- argumentOffset + 8
-                x.Push(value)  
+                let i = dec &argumentIndex
+                arguments.[i] <- Argument.Double value 
 
-        member x.PushIntArg(cc : CallingConvention, r : Register, wide : bool) =
-            let i = dec &argumentIndex
-            if i < cc.registers.Length then
-                x.Mov(cc.registers.[i], r, wide)
+        member x.PushIntArg(cc : CallingConvention, location : nativeint, wide : bool) =
+            if RuntimeInformation.IsOSPlatform OSPlatform.Windows then
+                let i = dec &argumentIndex
+                x.Load(Register.Rax, location, wide)
+                if i < cc.registers.Length then
+                    x.Mov(cc.registers.[i], Register.Rax, wide)
+                else
+                    argumentOffset <- argumentOffset + 8
+                    x.Push(Register.Rax)
             else
-                argumentOffset <- argumentOffset + 8
-                x.Push(r)
+                let i = dec &argumentIndex
+                arguments.[i] <- if wide then Argument.UInt64Ptr (NativePtr.ofNativeInt location) else Argument.UInt32Ptr (NativePtr.ofNativeInt location)
 
-        member x.PushFloatArg(cc : CallingConvention, r : Register, wide : bool) =
-            let i = dec &argumentIndex
-            if i < cc.floatRegisters.Length then
-                x.Mov(cc.floatRegisters.[i], r, wide)
+
+        member x.PushFloatArg(cc : CallingConvention, location : nativeint, wide : bool) =
+            if RuntimeInformation.IsOSPlatform OSPlatform.Windows then
+                let i = dec &argumentIndex
+                x.Load(Register.Rax, location, wide)
+                if i < cc.floatRegisters.Length then
+                    x.Mov(cc.floatRegisters.[i], Register.Rax, wide)
+                else
+                    argumentOffset <- argumentOffset + 8
+                    x.Push(Register.Rax)
             else
-                argumentOffset <- argumentOffset + 8
-                x.Push(r)
+                let i = dec &argumentIndex
+                arguments.[i] <- if wide then Argument.FloatPtr (NativePtr.ofNativeInt location) else Argument.DoublePtr (NativePtr.ofNativeInt location)
 
 
         member private x.Dispose(disposing : bool) =
@@ -797,7 +934,7 @@ module AMD64 =
             x.Cmp(Register.Rax, 0u)
             x.Jump(JumpCondition.Equal,noEval)
             x.BeginCall(0)
-            x.Call(localConvention, del.Pointer)
+            x.Call(localConvention, fun r -> x.Mov(r, del.Pointer))
             x.Mark noEval
 
             { new IDisposable with
@@ -859,18 +996,17 @@ module AMD64 =
             member x.BeginFunction() = x.Begin()
             member x.EndFunction() = x.End()
             member x.BeginCall(args : int) = x.BeginCall(args)
-            member x.Call (ptr : nativeint) = x.Call(localConvention, ptr)
+            member x.Call (ptr : nativeint) = x.Call(localConvention, fun r -> x.Mov(r, ptr))
             member x.CallIndirect(ptr : nativeptr<nativeint>) =
-                x.Load(Register.Rax, ptr)
-                x.Call(localConvention, Register.Rax)
+                x.Call(localConvention, fun r -> x.Load(r, ptr))
 
             member x.PushArg(v : nativeint) = x.PushArg(localConvention, uint64 v)
             member x.PushArg(v : int) = x.PushArg(localConvention, uint32 v)
             member x.PushArg(v : float32) = x.PushArg(localConvention, v)
-            member x.PushPtrArg(loc) = x.Load(Register.Rax, loc, true); x.PushIntArg(localConvention, Register.Rax, true)
-            member x.PushIntArg(loc) = x.Load(Register.Rax, loc, false); x.PushIntArg(localConvention, Register.Rax, false)
-            member x.PushFloatArg(loc) = x.Load(Register.Rax, loc, false); x.PushFloatArg(localConvention, Register.Rax, false)
-            member x.PushDoubleArg(loc) = x.Load(Register.Rax, loc, true); x.PushFloatArg(localConvention, Register.Rax, true)
+            member x.PushPtrArg(loc) = x.PushIntArg(localConvention, loc, true)
+            member x.PushIntArg(loc) = x.PushIntArg(localConvention, loc, false)
+            member x.PushFloatArg(loc) = x.PushFloatArg(localConvention, loc, false)
+            member x.PushDoubleArg(loc) = x.PushFloatArg(localConvention, loc, true)
 
             member x.Ret() = x.Ret()
 
