@@ -619,8 +619,123 @@ let jitMem =
                     JitMem.Free(ptr, nativeint code.Length)
         }
 
-        
-        
+        test "Copy" {
+            init()
+            do
+                let src = [| 123 |]
+                let dst = [| 0 |]
+                use pSrc = fixed src
+                use pDst = fixed dst
+
+                let code =
+                    use ms = new SystemMemoryStream()
+                    use ass = AssemblerStream.create ms
+
+
+                    ass.BeginFunction()
+                    
+                    ass.Copy(NativePtr.toNativeInt pSrc, NativePtr.toNativeInt pDst, false)
+
+                    ass.EndFunction()
+                    ass.Ret()
+                    ms.ToMemory()
+
+                let ptr = JitMem.Alloc(nativeint code.Length)
+                try
+                    JitMem.Copy(code, ptr)
+
+                    let action = Marshal.GetDelegateForFunctionPointer<Action>(ptr)
+
+                    action.Invoke()
+                    Expect.equal dst.[0] 123 "copy failed"
+                finally
+                    JitMem.Free(ptr, nativeint code.Length)
+        }
+
+
+        test "PushPop" {
+            init()
+            do
+                let dst = [| 0 |]
+                use pDst = fixed dst
+
+                let code =
+                    use ms = new SystemMemoryStream()
+                    use ass = AssemblerStream.create ms
+
+                    let r = ass.ReturnRegister
+                    let r1 = ass.ArgumentRegisters.[1]
+
+                    ass.BeginFunction()
+                    
+                    ass.Set(r, 123)
+                    ass.Push r
+                    ass.Set(r, 321)
+                    ass.Pop r
+
+                    ass.Set(r1, NativePtr.toNativeInt pDst)
+                    ass.Store(r1, r, false)
+
+                    ass.EndFunction()
+                    ass.Ret()
+                    ms.ToMemory()
+
+                let ptr = JitMem.Alloc(nativeint code.Length)
+                try
+                    JitMem.Copy(code, ptr)
+
+                    let action = Marshal.GetDelegateForFunctionPointer<Action>(ptr)
+
+                    action.Invoke()
+                    Expect.equal dst.[0] 123 "push/pop failed"
+                finally
+                    JitMem.Free(ptr, nativeint code.Length)
+        }
+
+
+        test "UnconditionalForwardJump" {
+            init()
+            do
+                let values = System.Collections.Generic.List<int>()
+                let action = IntAction values.Add
+                let pAction = Marshal.GetFunctionPointerForDelegate action
+
+                let code =
+                    use ms = new SystemMemoryStream()
+                    use ass = AssemblerStream.create ms
+
+                    ass.BeginFunction()
+
+                    let l = ass.NewLabel()
+                    ass.Jump(l)
+
+                    ass.BeginCall(1)
+                    ass.PushArg 123
+                    ass.Call pAction
+                    
+                    ass.Mark l
+                    ass.BeginCall(1)
+                    ass.PushArg 321
+                    ass.Call pAction
+
+                    ass.EndFunction()
+                    ass.Ret()
+                    ms.ToMemory()
+
+                let ptr = JitMem.Alloc(nativeint code.Length)
+                try
+                    JitMem.Copy(code, ptr)
+
+                    let action = Marshal.GetDelegateForFunctionPointer<Action>(ptr)
+
+                    action.Invoke()
+                    Expect.equal (Seq.toList values) [321] "inconsistent calls"
+                    values.Clear()
+
+                finally
+                    JitMem.Free(ptr, nativeint code.Length)
+        }
+
         test "ConditionalForwardJump" {
             init()
             do
