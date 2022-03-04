@@ -506,6 +506,171 @@ let jitMem =
             JitMem.Free(ptr, nativeint code.Length)
             Expect.equal (Seq.toList values) [(0,1.0f,2n,3.0f,4,5,6.0f,7.0f,8,9.0f,10); (10,11.0f,12n,13.0f,14,15,16.0f,17.0f,18,19.0f,20)] "inconsistent calls"
         }
+    
+
+        test "Store" {
+            init()
+            do
+                let dst = [| 1 |]
+                use pDst = fixed dst
+
+                let code =
+                    use ms = new SystemMemoryStream()
+                    use ass = AssemblerStream.create ms
+
+
+                    let r0 = ass.ReturnRegister
+                    let r1 = ass.ArgumentRegisters.[1]
+
+                    ass.BeginFunction()
+                    ass.Set(r0, 123)
+                    ass.Set(r1, NativePtr.toNativeInt pDst)
+                    ass.Store(r1, r0, false)
+
+                    ass.EndFunction()
+                    ass.Ret()
+                    ms.ToMemory()
+
+                let ptr = JitMem.Alloc(nativeint code.Length)
+                try
+                    JitMem.Copy(code, ptr)
+
+                    let action = Marshal.GetDelegateForFunctionPointer<Action>(ptr)
+
+                    action.Invoke()
+                    Expect.equal dst.[0] 123 "store failed"
+                finally
+                    JitMem.Free(ptr, nativeint code.Length)
+        }
+    
+        test "Add" {
+            init()
+            do
+                let dst = [| 1 |]
+                use pDst = fixed dst
+
+                let code =
+                    use ms = new SystemMemoryStream()
+                    use ass = AssemblerStream.create ms
+
+
+                    let r0 = ass.ReturnRegister
+                    let r1 = ass.ArgumentRegisters.[1]
+
+                    ass.BeginFunction()
+                    ass.Set(r0, 123)
+                    ass.Set(r1, 321)
+                    ass.AddInt(r0, r1, false)
+
+                    ass.Set(r1, NativePtr.toNativeInt pDst)
+                    ass.Store(r1, r0, false)
+
+                    ass.EndFunction()
+                    ass.Ret()
+                    ms.ToMemory()
+
+                let ptr = JitMem.Alloc(nativeint code.Length)
+                try
+                    JitMem.Copy(code, ptr)
+
+                    let action = Marshal.GetDelegateForFunctionPointer<Action>(ptr)
+
+                    action.Invoke()
+                    Expect.equal dst.[0] 444 "add failed"
+                finally
+                    JitMem.Free(ptr, nativeint code.Length)
+        }
+
+        test "Mul" {
+            init()
+            do
+                let dst = [| 1 |]
+                use pDst = fixed dst
+
+                let code =
+                    use ms = new SystemMemoryStream()
+                    use ass = AssemblerStream.create ms
+
+
+                    let r0 = ass.ReturnRegister
+                    let r1 = ass.ArgumentRegisters.[1]
+
+                    ass.BeginFunction()
+                    ass.Set(r0, 123)
+                    ass.Set(r1, 321)
+                    ass.MulInt(r0, r1, false)
+
+                    ass.Set(r1, NativePtr.toNativeInt pDst)
+                    ass.Store(r1, r0, false)
+
+                    ass.EndFunction()
+                    ass.Ret()
+                    ms.ToMemory()
+
+                let ptr = JitMem.Alloc(nativeint code.Length)
+                try
+                    JitMem.Copy(code, ptr)
+
+                    let action = Marshal.GetDelegateForFunctionPointer<Action>(ptr)
+
+                    action.Invoke()
+                    Expect.equal dst.[0] 39483 "mul failed"
+                finally
+                    JitMem.Free(ptr, nativeint code.Length)
+        }
+
+        
+        
+        test "ConditionalForwardJump" {
+            init()
+            do
+                let values = System.Collections.Generic.List<int>()
+                let action = IntAction values.Add
+                let pAction = Marshal.GetFunctionPointerForDelegate action
+
+                let cond = [| 1 |]
+                use pCond = fixed cond
+
+                let code =
+                    use ms = new SystemMemoryStream()
+                    use ass = AssemblerStream.create ms
+
+                    ass.BeginFunction()
+
+                    let l = ass.NewLabel()
+                    ass.Cmp(NativePtr.toNativeInt pCond, 0)
+                    ass.Jump(JumpCondition.Equal, l)
+
+                    ass.BeginCall(1)
+                    ass.PushArg 123
+                    ass.Call pAction
+                    
+                    ass.Mark l
+                    ass.BeginCall(1)
+                    ass.PushArg 321
+                    ass.Call pAction
+
+                    ass.EndFunction()
+                    ass.Ret()
+                    ms.ToMemory()
+
+                let ptr = JitMem.Alloc(nativeint code.Length)
+                try
+                    JitMem.Copy(code, ptr)
+
+                    let action = Marshal.GetDelegateForFunctionPointer<Action>(ptr)
+
+                    action.Invoke()
+                    Expect.equal (Seq.toList values) [123; 321] "inconsistent calls"
+                    values.Clear()
+
+                    cond.[0] <- 0
+                    action.Invoke()
+                    Expect.equal (Seq.toList values) [321] "inconsistent calls"
+                    values.Clear()
+                finally
+                    JitMem.Free(ptr, nativeint code.Length)
+        }
     ]
 
 type Operation<'a> =
@@ -713,7 +878,7 @@ let fragmentTests =
         }
 
         let config = { FsCheckConfig.defaultConfig with maxTest = 1000; endSize = 1000; arbitrary = [ typeof<ArbitraryModifiers> ] }
-        testPropertyWithConfig config "AddRemove" (fun (NonEmptyArray (arr : Operation<RandomInt>[])) ->
+        testPropertyWithConfig config "InsertRemove" (fun (NonEmptyArray (arr : Operation<RandomInt>[])) ->
             init()
             let mutable fragments = IndexList.empty
             let (prog, run, disp) = createProgram()
@@ -747,13 +912,13 @@ let fragmentTests =
                 Expect.equal actual expected "inconsistent result"
         )
 
-        let config = { FsCheckConfig.defaultConfig with maxTest = 1000; endSize = 1000; arbitrary = [ typeof<ArbitraryModifiers> ] }
-        testPropertyWithConfig config "NAry" (fun (NonEmptyArray (arr : Operation<option<Argument> * option<Argument> * option<Argument> * option<Argument> * option<Argument> * list<Argument>>[])) ->
+        let config = { FsCheckConfig.defaultConfig with maxTest = 200; endSize = 1000; arbitrary = [ typeof<ArbitraryModifiers> ] }
+        testPropertyWithConfig config "NAryCalls" (fun (NonEmptyArray (arr : Operation<option<Argument> * option<Argument> * option<Argument> * option<Argument> * option<Argument> * list<Argument>>[])) ->
             init()
             let calls = System.Collections.Generic.List()
             let delegates = Dict<list<Type>, PinnedDelegate>()
 
-            let mem = Marshal.AllocHGlobal (1 <<< 20)
+            let mem = Marshal.AllocHGlobal (8 <<< 20)
             try
                 let mutable current = mem
 
@@ -834,12 +999,7 @@ let fragmentTests =
             finally
                 Marshal.FreeHGlobal mem
         
-            // if delegates.Count > 0 then
-            //     let args = delegates |> Dict.toSeq |> Seq.map (fun (k,_) -> List.length k) |> Set.ofSeq
 
-            //     let mutable ranges = RangeSet.empty
-            //     for i in args do ranges <- RangeSet.insert (Range1i(i,i)) ranges
 
-            //     printfn "%0A arguments" ranges
         )
     ]
