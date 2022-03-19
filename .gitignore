@@ -31,3 +31,4 @@ src/MiniCVNative/build
 /.vcpkg
 /.vscode/*.log
 /src/jitmem/build/
+/bin/pack

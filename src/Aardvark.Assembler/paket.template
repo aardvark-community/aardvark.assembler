@@ -1,0 +1,11 @@
+type project
+id Aardvark.Assembler
+authors Aardvark Platform Team
+owners Aardvark Platform Team
+projectUrl http://github.com/aardvark-community
+licenseUrl http://www.apache.org/licenses/LICENSE-2.0.txt
+repositoryType git
+repositoryUrl https://github.com/aardvark-community/aardvark.assembler
+description
+    a simple Assembler for x64/arm64 
+include-pdbs true

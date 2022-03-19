@@ -60,23 +60,39 @@ jobs:
         run: dotnet build Assembler.sln
       - name: Test
         run: dotnet test -l "console;verbosity=detailed" --no-build --nologo
-  # linux_arm64:
-  #   name: Linux (arm64)
-  #   runs-on: ubuntu-18.04
-  #   steps:
-  #     - uses: actions/checkout@v2.1.0
-  #     - uses: uraimo/run-on-arch-action@v2.1.1
-  #       name: Run commands
-  #       id: runcmd
-  #       with:
-  #         arch: aarch64
-  #         distro: ubuntu18.04
-  #         run: |
-  #           apt-get update
-  #           apt-get install -y wget libicu-dev
-  #           wget -q https://download.visualstudio.microsoft.com/download/pr/ad60a07c-d4f0-4225-9154-c3a2ec0f34cf/a588cd2b94db2214f6e5dcd02c4aa37a/dotnet-sdk-6.0.200-linux-arm64.tar.gz
-  #           tar -xf dotnet-sdk-6.0.200-linux-arm64.tar.gz
-  #           ./dotnet tool restore
-  #           ./dotnet paket restore
-  #           ./dotnet build Assembler.sln
-  #           ./dotnet test -l "console;verbosity=detailed" --no-build --nologo
+
+  pack:
+    name: Pack
+    runs-on: windows-latest
+    depends-on: [linux, windows, macos]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Install Dotnet
+        uses: actions/setup-dotnet@v1
+        with:
+          dotnet-version: '6.0.100'
+      - name: Restore Tools
+        run: dotnet tool restore
+      - name: Paket Restore
+        run: dotnet paket restore
+      - name: Build
+        run: dotnet build Assembler.sln
+      - name: Pack
+        run: dotnet aardpack Assembler.sln --notag
+      - name: Upload Packages
+        uses: actions/upload-artifact@v2
+        with:
+          name: packages
+          path: bin\pack
+      # - name: GitHub Packages
+      #   env:
+      #     NUGET_KEY: ${{ secrets.GITHUB_TOKEN }}
+      #   shell: cmd
+      #   run: dotnet nuget push "bin\pack\*.nupkg" -k %NUGET_KEY% -s "https://nuget.pkg.github.com/aardvark-community/index.json" --skip-duplicate
+      # - name: NuGet
+      #   env:
+      #     NUGET_KEY: ${{ secrets.NUGET_KEY }}
+      #   shell: cmd
+      #   run: dotnet nuget push "bin\pack\*.nupkg" -k %NUGET_KEY% -s "https://api.nuget.org/v3/index.json" --skip-duplicate
+ 
