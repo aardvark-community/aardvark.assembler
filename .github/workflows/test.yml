@@ -64,7 +64,10 @@ jobs:
   pack:
     name: Pack
     runs-on: windows-latest
-    depends-on: [linux, windows, macos]
+    needs: 
+      - linux
+      - windows
+      - macos
     steps:
       - name: Checkout
         uses: actions/checkout@v2
