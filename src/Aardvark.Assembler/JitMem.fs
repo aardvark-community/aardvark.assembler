@@ -9,6 +9,7 @@ open Microsoft.FSharp.NativeInterop
 
 #nowarn "9"
 
+/// Abstractions for handling executable memory
 [<AbstractClass; Sealed>]
 type JitMem private() =
     [<DllImport("jitmem")>]
@@ -25,6 +26,7 @@ type JitMem private() =
 
     static let mutable pageSize = ref 0un
 
+    /// The size of a page in bytes.
     static member PageSize = 
         lock pageSize (fun () ->
             if pageSize.Value = 0un then
@@ -35,6 +37,7 @@ type JitMem private() =
                 pageSize.Value
         )
 
+    /// Allocates executable memory with (at least) the given size.
     static member Alloc(size : nativeint) =
         if size <= 0n then
             0n
@@ -48,6 +51,7 @@ type JitMem private() =
             else
                 Aardvark.Base.ExecutableMemory.alloc size
 
+    /// Frees executable memory. The size shall be idenitcal to the one used in `Alloc`.
     static member Free(ptr : nativeint, size : nativeint) =
         if size > 0n then
             if RuntimeInformation.IsOSPlatform OSPlatform.OSX then
@@ -59,6 +63,7 @@ type JitMem private() =
             else
                 Aardvark.Base.ExecutableMemory.free ptr size
 
+    /// Copies the source-pointer to the executable memory-pointer.
     static member Copy(src : nativeint, dst : nativeint, size : nativeint) =
         if size > 0n then
             if RuntimeInformation.IsOSPlatform OSPlatform.OSX then
@@ -70,12 +75,14 @@ type JitMem private() =
                 let sDst = System.Span<byte>(vDst, int size)
                 sSrc.CopyTo(sDst)
 
+    /// Copies the given `Memory<byte>` to the executable memory-pointer.
     static member Copy(src : Memory<byte>, dst : nativeint) =
         if src.Length > 0 then
             use hSrc = src.Pin()
             let pSrc = hSrc.Pointer |> NativePtr.ofVoidPtr<byte> |> NativePtr.toNativeInt
             JitMem.Copy(pSrc, dst, nativeint src.Length)
             
+    /// Copies the given `Memory<byte>` to the executable memory-pointer.
     static member Copy(src : Memory<byte>, dst : managedptr) =
         if src.Length > 0 then
             if nativeint src.Length <> dst.Size then failwithf "inconsitent copy-size: %d vs %d" src.Length dst.Size
@@ -85,6 +92,7 @@ type JitMem private() =
                 JitMem.Copy(pSrc, pDst, dst.Size)
             )
             
+    /// Copies the given `Memory<byte>` to the executable memory-pointer with a given offset.
     static member Copy(src : Memory<byte>, dst : managedptr, dstOffset : nativeint) =
         if src.Length > 0 then
             if dstOffset + nativeint src.Length > dst.Size then failwithf "copy range exceeds dst size: %d + %d vs %d" dstOffset src.Length dst.Size

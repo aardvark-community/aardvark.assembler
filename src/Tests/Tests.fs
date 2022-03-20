@@ -64,14 +64,12 @@ let jitMem =
 
         test "Executable" {
             init()
-            let code =
-                use ms = new SystemMemoryStream()
-                use ass = AssemblerStream.create ms
-
-                ass.BeginFunction()
-                ass.EndFunction()
-                ass.Ret()
-                ms.ToMemory()
+            let code = 
+                AssemblerStream.toMemory (fun ass ->
+                    ass.BeginFunction()
+                    ass.EndFunction()
+                    ass.Ret()
+                )
 
             let ptr = JitMem.Alloc(nativeint code.Length)
             JitMem.Copy(code, ptr)
@@ -93,22 +91,20 @@ let jitMem =
             let pAction = Marshal.GetFunctionPointerForDelegate action
 
             let code =
-                use ms = new SystemMemoryStream()
-                use ass = AssemblerStream.create ms
+                AssemblerStream.toMemory (fun ass ->
+                    ass.BeginFunction()
 
-                ass.BeginFunction()
+                    ass.BeginCall(1)
+                    ass.PushArg 123
+                    ass.Call pAction
+                    
+                    ass.BeginCall(1)
+                    ass.PushArg 321
+                    ass.Call pAction
 
-                ass.BeginCall(1)
-                ass.PushArg 123
-                ass.Call pAction
-                
-                ass.BeginCall(1)
-                ass.PushArg 321
-                ass.Call pAction
-
-                ass.EndFunction()
-                ass.Ret()
-                ms.ToMemory()
+                    ass.EndFunction()
+                    ass.Ret()
+                )
 
             let ptr = JitMem.Alloc(nativeint code.Length)
             JitMem.Copy(code, ptr)
@@ -130,22 +126,20 @@ let jitMem =
                 use mem = fixed [| 123; 321 |]
 
                 let code =
-                    use ms = new SystemMemoryStream()
-                    use ass = AssemblerStream.create ms
+                    AssemblerStream.toMemory (fun ass ->
+                        ass.BeginFunction()
 
-                    ass.BeginFunction()
+                        ass.BeginCall(1)
+                        ass.PushIntArg (NativePtr.toNativeInt mem)
+                        ass.Call pAction
+                        
+                        ass.BeginCall(1)
+                        ass.PushIntArg (NativePtr.toNativeInt (NativePtr.add mem 1))
+                        ass.Call pAction
 
-                    ass.BeginCall(1)
-                    ass.PushIntArg (NativePtr.toNativeInt mem)
-                    ass.Call pAction
-                    
-                    ass.BeginCall(1)
-                    ass.PushIntArg (NativePtr.toNativeInt (NativePtr.add mem 1))
-                    ass.Call pAction
-
-                    ass.EndFunction()
-                    ass.Ret()
-                    ms.ToMemory()
+                        ass.EndFunction()
+                        ass.Ret()
+                    )
 
                 let ptr = JitMem.Alloc(nativeint code.Length)
                 JitMem.Copy(code, ptr)
@@ -165,22 +159,20 @@ let jitMem =
             let pAction = Marshal.GetFunctionPointerForDelegate action
 
             let code =
-                use ms = new SystemMemoryStream()
-                use ass = AssemblerStream.create ms
+                AssemblerStream.toMemory (fun ass ->
+                    ass.BeginFunction()
 
-                ass.BeginFunction()
+                    ass.BeginCall(1)
+                    ass.PushArg 123n
+                    ass.Call pAction
+                    
+                    ass.BeginCall(1)
+                    ass.PushArg 321n
+                    ass.Call pAction
 
-                ass.BeginCall(1)
-                ass.PushArg 123n
-                ass.Call pAction
-                
-                ass.BeginCall(1)
-                ass.PushArg 321n
-                ass.Call pAction
-
-                ass.EndFunction()
-                ass.Ret()
-                ms.ToMemory()
+                    ass.EndFunction()
+                    ass.Ret()
+                )
 
             let ptr = JitMem.Alloc(nativeint code.Length)
             JitMem.Copy(code, ptr)
@@ -202,22 +194,20 @@ let jitMem =
                 use mem = fixed [| 123n; 321n |]
 
                 let code =
-                    use ms = new SystemMemoryStream()
-                    use ass = AssemblerStream.create ms
+                    AssemblerStream.toMemory (fun ass -> 
+                        ass.BeginFunction()
 
-                    ass.BeginFunction()
+                        ass.BeginCall(1)
+                        ass.PushPtrArg (NativePtr.toNativeInt mem)
+                        ass.Call pAction
+                        
+                        ass.BeginCall(1)
+                        ass.PushPtrArg (NativePtr.toNativeInt (NativePtr.add mem 1))
+                        ass.Call pAction
 
-                    ass.BeginCall(1)
-                    ass.PushPtrArg (NativePtr.toNativeInt mem)
-                    ass.Call pAction
-                    
-                    ass.BeginCall(1)
-                    ass.PushPtrArg (NativePtr.toNativeInt (NativePtr.add mem 1))
-                    ass.Call pAction
-
-                    ass.EndFunction()
-                    ass.Ret()
-                    ms.ToMemory()
+                        ass.EndFunction()
+                        ass.Ret()
+                    )
 
                 let ptr = JitMem.Alloc(nativeint code.Length)
                 JitMem.Copy(code, ptr)
@@ -237,22 +227,20 @@ let jitMem =
             let pAction = Marshal.GetFunctionPointerForDelegate action
 
             let code =
-                use ms = new SystemMemoryStream()
-                use ass = AssemblerStream.create ms
+                AssemblerStream.toMemory (fun ass ->
+                    ass.BeginFunction()
 
-                ass.BeginFunction()
+                    ass.BeginCall(1)
+                    ass.PushArg 1.23f
+                    ass.Call pAction
+                    
+                    ass.BeginCall(1)
+                    ass.PushArg 3.21f
+                    ass.Call pAction
 
-                ass.BeginCall(1)
-                ass.PushArg 1.23f
-                ass.Call pAction
-                
-                ass.BeginCall(1)
-                ass.PushArg 3.21f
-                ass.Call pAction
-
-                ass.EndFunction()
-                ass.Ret()
-                ms.ToMemory()
+                    ass.EndFunction()
+                    ass.Ret()
+                )
 
             let ptr = JitMem.Alloc(nativeint code.Length)
             JitMem.Copy(code, ptr)
@@ -274,22 +262,20 @@ let jitMem =
                 use mem = fixed [| 1.23f; 3.21f |]
 
                 let code =
-                    use ms = new SystemMemoryStream()
-                    use ass = AssemblerStream.create ms
+                    AssemblerStream.toMemory (fun ass ->
+                        ass.BeginFunction()
 
-                    ass.BeginFunction()
+                        ass.BeginCall(1)
+                        ass.PushFloatArg (NativePtr.toNativeInt mem)
+                        ass.Call pAction
+                        
+                        ass.BeginCall(1)
+                        ass.PushFloatArg (NativePtr.toNativeInt (NativePtr.add mem 1))
+                        ass.Call pAction
 
-                    ass.BeginCall(1)
-                    ass.PushFloatArg (NativePtr.toNativeInt mem)
-                    ass.Call pAction
-                    
-                    ass.BeginCall(1)
-                    ass.PushFloatArg (NativePtr.toNativeInt (NativePtr.add mem 1))
-                    ass.Call pAction
-
-                    ass.EndFunction()
-                    ass.Ret()
-                    ms.ToMemory()
+                        ass.EndFunction()
+                        ass.Ret()
+                    )
 
                 let ptr = JitMem.Alloc(nativeint code.Length)
                 JitMem.Copy(code, ptr)
@@ -312,22 +298,20 @@ let jitMem =
                 use mem = fixed [| 1.23; 3.21 |]
 
                 let code =
-                    use ms = new SystemMemoryStream()
-                    use ass = AssemblerStream.create ms
+                    AssemblerStream.toMemory (fun ass ->
+                        ass.BeginFunction()
 
-                    ass.BeginFunction()
+                        ass.BeginCall(1)
+                        ass.PushDoubleArg (NativePtr.toNativeInt mem)
+                        ass.Call pAction
+                        
+                        ass.BeginCall(1)
+                        ass.PushDoubleArg (NativePtr.toNativeInt (NativePtr.add mem 1))
+                        ass.Call pAction
 
-                    ass.BeginCall(1)
-                    ass.PushDoubleArg (NativePtr.toNativeInt mem)
-                    ass.Call pAction
-                    
-                    ass.BeginCall(1)
-                    ass.PushDoubleArg (NativePtr.toNativeInt (NativePtr.add mem 1))
-                    ass.Call pAction
-
-                    ass.EndFunction()
-                    ass.Ret()
-                    ms.ToMemory()
+                        ass.EndFunction()
+                        ass.Ret()
+                    )
 
                 let ptr = JitMem.Alloc(nativeint code.Length)
                 JitMem.Copy(code, ptr)
@@ -347,43 +331,41 @@ let jitMem =
 
         
             let code =
-                use ms = new SystemMemoryStream()
-                use ass = AssemblerStream.create ms
+                AssemblerStream.toMemory (fun ass ->
+                    ass.BeginFunction()
 
-                ass.BeginFunction()
+                    ass.BeginCall(11)
+                    ass.PushArg 10
+                    ass.PushArg 9
+                    ass.PushArg 8
+                    ass.PushArg 7
+                    ass.PushArg 6
+                    ass.PushArg 5
+                    ass.PushArg 4
+                    ass.PushArg 3
+                    ass.PushArg 2
+                    ass.PushArg 1
+                    ass.PushArg 0
+                    ass.Call pAction
 
-                ass.BeginCall(11)
-                ass.PushArg 10
-                ass.PushArg 9
-                ass.PushArg 8
-                ass.PushArg 7
-                ass.PushArg 6
-                ass.PushArg 5
-                ass.PushArg 4
-                ass.PushArg 3
-                ass.PushArg 2
-                ass.PushArg 1
-                ass.PushArg 0
-                ass.Call pAction
+                    
+                    ass.BeginCall(11)
+                    ass.PushArg 20
+                    ass.PushArg 19
+                    ass.PushArg 18
+                    ass.PushArg 17
+                    ass.PushArg 16
+                    ass.PushArg 15
+                    ass.PushArg 14
+                    ass.PushArg 13
+                    ass.PushArg 12
+                    ass.PushArg 11
+                    ass.PushArg 10
+                    ass.Call pAction
 
-                
-                ass.BeginCall(11)
-                ass.PushArg 20
-                ass.PushArg 19
-                ass.PushArg 18
-                ass.PushArg 17
-                ass.PushArg 16
-                ass.PushArg 15
-                ass.PushArg 14
-                ass.PushArg 13
-                ass.PushArg 12
-                ass.PushArg 11
-                ass.PushArg 10
-                ass.Call pAction
-
-                ass.EndFunction()
-                ass.Ret()
-                ms.ToMemory()
+                    ass.EndFunction()
+                    ass.Ret()
+                )
 
             let ptr = JitMem.Alloc(nativeint code.Length)
             JitMem.Copy(code, ptr)
@@ -402,43 +384,41 @@ let jitMem =
 
         
             let code =
-                use ms = new SystemMemoryStream()
-                use ass = AssemblerStream.create ms
+                AssemblerStream.toMemory (fun ass ->
+                    ass.BeginFunction()
 
-                ass.BeginFunction()
+                    ass.BeginCall(11)
+                    ass.PushArg 10.0f
+                    ass.PushArg 9.0f
+                    ass.PushArg 8.0f
+                    ass.PushArg 7.0f
+                    ass.PushArg 6.0f
+                    ass.PushArg 5.0f
+                    ass.PushArg 4.0f
+                    ass.PushArg 3.0f
+                    ass.PushArg 2.0f
+                    ass.PushArg 1.0f
+                    ass.PushArg 0.0f
+                    ass.Call pAction
 
-                ass.BeginCall(11)
-                ass.PushArg 10.0f
-                ass.PushArg 9.0f
-                ass.PushArg 8.0f
-                ass.PushArg 7.0f
-                ass.PushArg 6.0f
-                ass.PushArg 5.0f
-                ass.PushArg 4.0f
-                ass.PushArg 3.0f
-                ass.PushArg 2.0f
-                ass.PushArg 1.0f
-                ass.PushArg 0.0f
-                ass.Call pAction
+                    
+                    ass.BeginCall(11)
+                    ass.PushArg 20.0f
+                    ass.PushArg 19.0f
+                    ass.PushArg 18.0f
+                    ass.PushArg 17.0f
+                    ass.PushArg 16.0f
+                    ass.PushArg 15.0f
+                    ass.PushArg 14.0f
+                    ass.PushArg 13.0f
+                    ass.PushArg 12.0f
+                    ass.PushArg 11.0f
+                    ass.PushArg 10.0f
+                    ass.Call pAction
 
-                
-                ass.BeginCall(11)
-                ass.PushArg 20.0f
-                ass.PushArg 19.0f
-                ass.PushArg 18.0f
-                ass.PushArg 17.0f
-                ass.PushArg 16.0f
-                ass.PushArg 15.0f
-                ass.PushArg 14.0f
-                ass.PushArg 13.0f
-                ass.PushArg 12.0f
-                ass.PushArg 11.0f
-                ass.PushArg 10.0f
-                ass.Call pAction
-
-                ass.EndFunction()
-                ass.Ret()
-                ms.ToMemory()
+                    ass.EndFunction()
+                    ass.Ret()
+                )
 
             let ptr = JitMem.Alloc(nativeint code.Length)
             JitMem.Copy(code, ptr)
@@ -459,43 +439,41 @@ let jitMem =
 
         
             let code =
-                use ms = new SystemMemoryStream()
-                use ass = AssemblerStream.create ms
+                AssemblerStream.toMemory (fun ass ->
+                    ass.BeginFunction()
+                    //  delegate of int * float32 * nativeint * float32 * int * int * float32 * float32 * int * float32 * int -> unit
+                    ass.BeginCall(11)
+                    ass.PushArg 10
+                    ass.PushArg 9.0f
+                    ass.PushArg 8
+                    ass.PushArg 7.0f
+                    ass.PushArg 6.0f
+                    ass.PushArg 5
+                    ass.PushArg 4
+                    ass.PushArg 3.0f
+                    ass.PushArg 2n
+                    ass.PushArg 1.0f
+                    ass.PushArg 0
+                    ass.Call pAction
 
-                ass.BeginFunction()
-                //  delegate of int * float32 * nativeint * float32 * int * int * float32 * float32 * int * float32 * int -> unit
-                ass.BeginCall(11)
-                ass.PushArg 10
-                ass.PushArg 9.0f
-                ass.PushArg 8
-                ass.PushArg 7.0f
-                ass.PushArg 6.0f
-                ass.PushArg 5
-                ass.PushArg 4
-                ass.PushArg 3.0f
-                ass.PushArg 2n
-                ass.PushArg 1.0f
-                ass.PushArg 0
-                ass.Call pAction
+                    
+                    ass.BeginCall(11)
+                    ass.PushArg 20
+                    ass.PushArg 19.0f
+                    ass.PushArg 18
+                    ass.PushArg 17.0f
+                    ass.PushArg 16.0f
+                    ass.PushArg 15
+                    ass.PushArg 14
+                    ass.PushArg 13.0f
+                    ass.PushArg 12n
+                    ass.PushArg 11.0f
+                    ass.PushArg 10
+                    ass.Call pAction
 
-                
-                ass.BeginCall(11)
-                ass.PushArg 20
-                ass.PushArg 19.0f
-                ass.PushArg 18
-                ass.PushArg 17.0f
-                ass.PushArg 16.0f
-                ass.PushArg 15
-                ass.PushArg 14
-                ass.PushArg 13.0f
-                ass.PushArg 12n
-                ass.PushArg 11.0f
-                ass.PushArg 10
-                ass.Call pAction
-
-                ass.EndFunction()
-                ass.Ret()
-                ms.ToMemory()
+                    ass.EndFunction()
+                    ass.Ret()
+                )
 
             let ptr = JitMem.Alloc(nativeint code.Length)
             JitMem.Copy(code, ptr)
@@ -515,21 +493,18 @@ let jitMem =
                 use pDst = fixed dst
 
                 let code =
-                    use ms = new SystemMemoryStream()
-                    use ass = AssemblerStream.create ms
+                    AssemblerStream.toMemory (fun ass ->
+                        let r0 = ass.ReturnRegister
+                        let r1 = ass.ArgumentRegisters.[1]
 
+                        ass.BeginFunction()
+                        ass.Set(r0, 123)
+                        ass.Set(r1, NativePtr.toNativeInt pDst)
+                        ass.Store(r1, r0, false)
 
-                    let r0 = ass.ReturnRegister
-                    let r1 = ass.ArgumentRegisters.[1]
-
-                    ass.BeginFunction()
-                    ass.Set(r0, 123)
-                    ass.Set(r1, NativePtr.toNativeInt pDst)
-                    ass.Store(r1, r0, false)
-
-                    ass.EndFunction()
-                    ass.Ret()
-                    ms.ToMemory()
+                        ass.EndFunction()
+                        ass.Ret()
+                    )
 
                 let ptr = JitMem.Alloc(nativeint code.Length)
                 try
@@ -550,24 +525,21 @@ let jitMem =
                 use pDst = fixed dst
 
                 let code =
-                    use ms = new SystemMemoryStream()
-                    use ass = AssemblerStream.create ms
+                    AssemblerStream.toMemory (fun ass ->
+                        let r0 = ass.ReturnRegister
+                        let r1 = ass.ArgumentRegisters.[1]
 
+                        ass.BeginFunction()
+                        ass.Set(r0, 123)
+                        ass.Set(r1, 321)
+                        ass.AddInt(r0, r1, false)
 
-                    let r0 = ass.ReturnRegister
-                    let r1 = ass.ArgumentRegisters.[1]
+                        ass.Set(r1, NativePtr.toNativeInt pDst)
+                        ass.Store(r1, r0, false)
 
-                    ass.BeginFunction()
-                    ass.Set(r0, 123)
-                    ass.Set(r1, 321)
-                    ass.AddInt(r0, r1, false)
-
-                    ass.Set(r1, NativePtr.toNativeInt pDst)
-                    ass.Store(r1, r0, false)
-
-                    ass.EndFunction()
-                    ass.Ret()
-                    ms.ToMemory()
+                        ass.EndFunction()
+                        ass.Ret()
+                    )
 
                 let ptr = JitMem.Alloc(nativeint code.Length)
                 try
@@ -588,24 +560,21 @@ let jitMem =
                 use pDst = fixed dst
 
                 let code =
-                    use ms = new SystemMemoryStream()
-                    use ass = AssemblerStream.create ms
+                    AssemblerStream.toMemory (fun ass ->
+                        let r0 = ass.ReturnRegister
+                        let r1 = ass.ArgumentRegisters.[1]
 
+                        ass.BeginFunction()
+                        ass.Set(r0, 123)
+                        ass.Set(r1, 321)
+                        ass.MulInt(r0, r1, false)
 
-                    let r0 = ass.ReturnRegister
-                    let r1 = ass.ArgumentRegisters.[1]
+                        ass.Set(r1, NativePtr.toNativeInt pDst)
+                        ass.Store(r1, r0, false)
 
-                    ass.BeginFunction()
-                    ass.Set(r0, 123)
-                    ass.Set(r1, 321)
-                    ass.MulInt(r0, r1, false)
-
-                    ass.Set(r1, NativePtr.toNativeInt pDst)
-                    ass.Store(r1, r0, false)
-
-                    ass.EndFunction()
-                    ass.Ret()
-                    ms.ToMemory()
+                        ass.EndFunction()
+                        ass.Ret()
+                    )
 
                 let ptr = JitMem.Alloc(nativeint code.Length)
                 try
@@ -628,17 +597,14 @@ let jitMem =
                 use pDst = fixed dst
 
                 let code =
-                    use ms = new SystemMemoryStream()
-                    use ass = AssemblerStream.create ms
+                    AssemblerStream.toMemory (fun ass ->
+                        ass.BeginFunction()
+                        
+                        ass.Copy(NativePtr.toNativeInt pSrc, NativePtr.toNativeInt pDst, false)
 
-
-                    ass.BeginFunction()
-                    
-                    ass.Copy(NativePtr.toNativeInt pSrc, NativePtr.toNativeInt pDst, false)
-
-                    ass.EndFunction()
-                    ass.Ret()
-                    ms.ToMemory()
+                        ass.EndFunction()
+                        ass.Ret()
+                    )
 
                 let ptr = JitMem.Alloc(nativeint code.Length)
                 try
@@ -660,25 +626,23 @@ let jitMem =
                 use pDst = fixed dst
 
                 let code =
-                    use ms = new SystemMemoryStream()
-                    use ass = AssemblerStream.create ms
+                    AssemblerStream.toMemory (fun ass ->
+                        let r = ass.ReturnRegister
+                        let r1 = ass.ArgumentRegisters.[1]
 
-                    let r = ass.ReturnRegister
-                    let r1 = ass.ArgumentRegisters.[1]
+                        ass.BeginFunction()
+                        
+                        ass.Set(r, 123)
+                        ass.Push r
+                        ass.Set(r, 321)
+                        ass.Pop r
 
-                    ass.BeginFunction()
-                    
-                    ass.Set(r, 123)
-                    ass.Push r
-                    ass.Set(r, 321)
-                    ass.Pop r
+                        ass.Set(r1, NativePtr.toNativeInt pDst)
+                        ass.Store(r1, r, false)
 
-                    ass.Set(r1, NativePtr.toNativeInt pDst)
-                    ass.Store(r1, r, false)
-
-                    ass.EndFunction()
-                    ass.Ret()
-                    ms.ToMemory()
+                        ass.EndFunction()
+                        ass.Ret()
+                    )
 
                 let ptr = JitMem.Alloc(nativeint code.Length)
                 try
@@ -701,26 +665,24 @@ let jitMem =
                 let pAction = Marshal.GetFunctionPointerForDelegate action
 
                 let code =
-                    use ms = new SystemMemoryStream()
-                    use ass = AssemblerStream.create ms
+                    AssemblerStream.toMemory (fun ass ->
+                        ass.BeginFunction()
 
-                    ass.BeginFunction()
+                        let l = ass.NewLabel()
+                        ass.Jump(l)
 
-                    let l = ass.NewLabel()
-                    ass.Jump(l)
+                        ass.BeginCall(1)
+                        ass.PushArg 123
+                        ass.Call pAction
+                        
+                        ass.Mark l
+                        ass.BeginCall(1)
+                        ass.PushArg 321
+                        ass.Call pAction
 
-                    ass.BeginCall(1)
-                    ass.PushArg 123
-                    ass.Call pAction
-                    
-                    ass.Mark l
-                    ass.BeginCall(1)
-                    ass.PushArg 321
-                    ass.Call pAction
-
-                    ass.EndFunction()
-                    ass.Ret()
-                    ms.ToMemory()
+                        ass.EndFunction()
+                        ass.Ret()
+                    )
 
                 let ptr = JitMem.Alloc(nativeint code.Length)
                 try
@@ -747,27 +709,25 @@ let jitMem =
                 use pCond = fixed cond
 
                 let code =
-                    use ms = new SystemMemoryStream()
-                    use ass = AssemblerStream.create ms
+                    AssemblerStream.toMemory (fun ass ->
+                        ass.BeginFunction()
 
-                    ass.BeginFunction()
+                        let l = ass.NewLabel()
+                        ass.Cmp(NativePtr.toNativeInt pCond, 0)
+                        ass.Jump(JumpCondition.Equal, l)
 
-                    let l = ass.NewLabel()
-                    ass.Cmp(NativePtr.toNativeInt pCond, 0)
-                    ass.Jump(JumpCondition.Equal, l)
+                        ass.BeginCall(1)
+                        ass.PushArg 123
+                        ass.Call pAction
+                        
+                        ass.Mark l
+                        ass.BeginCall(1)
+                        ass.PushArg 321
+                        ass.Call pAction
 
-                    ass.BeginCall(1)
-                    ass.PushArg 123
-                    ass.Call pAction
-                    
-                    ass.Mark l
-                    ass.BeginCall(1)
-                    ass.PushArg 321
-                    ass.Call pAction
-
-                    ass.EndFunction()
-                    ass.Ret()
-                    ms.ToMemory()
+                        ass.EndFunction()
+                        ass.Ret()
+                    )
 
                 let ptr = JitMem.Alloc(nativeint code.Length)
                 try
@@ -838,8 +798,6 @@ module Delegate =
                                 name, 
                                 TypeAttributes.Class ||| TypeAttributes.Public ||| TypeAttributes.Sealed, 
                                 typeof<System.MulticastDelegate>)
-
-    
 
             let constructorBuilder = typeBuilder.DefineConstructor(MethodAttributes.Public, CallingConventions.Standard, [| typeof<obj>; typeof<System.IntPtr> |])
             constructorBuilder.SetImplementationFlags(MethodImplAttributes.Runtime ||| MethodImplAttributes.Managed);

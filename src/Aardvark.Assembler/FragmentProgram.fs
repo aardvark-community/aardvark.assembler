@@ -18,6 +18,9 @@ type internal FragmentProgramState<'a> =
         mutable epilog : Fragment<'a>
     }
 
+/// A FragmentProgram represents a native program that can be modified on Fragment-level.
+/// New Fragments can be Inserted at arbitrary positions, and old Fragments can be removed.
+/// Each Fragment is identified by a unique tag and can update its executed code.
 and FragmentProgram<'a> internal(differential : bool, compile : option<'a> -> 'a -> IAssemblerStream -> unit) =
     static let initialCapacity = 64n <<< 10
     static let config = 
@@ -26,13 +29,6 @@ and FragmentProgram<'a> internal(differential : bool, compile : option<'a> -> 'a
             MemoryManagerConfig.mfree = fun ptr size -> JitMem.Free(ptr, size)
             MemoryManagerConfig.mcopy = fun src dst size -> JitMem.Copy(src, dst, size)
         }
-    
-    static let toMemory (action : IAssemblerStream -> unit) : Memory<byte> =
-        use ms = new SystemMemoryStream()
-        use ass = AssemblerStream.create ms
-        action ass
-        ass.Jump 0
-        ms.ToMemory()
 
     let compile = OptimizedClosures.FSharpFunc<_,_,_,_>.Adapt compile
     let manager = new MemoryManager(initialCapacity, config)
@@ -57,8 +53,8 @@ and FragmentProgram<'a> internal(differential : bool, compile : option<'a> -> 'a
         }
 
     let mutable first, last =
-        let prolog = toMemory (fun ass -> ass.BeginFunction())
-        let epilog = toMemory (fun ass -> ass.EndFunction(); ass.Ret())
+        let prolog = AssemblerStream.toMemory (fun ass -> ass.BeginFunction())
+        let epilog = AssemblerStream.toMemory (fun ass -> ass.EndFunction(); ass.Ret())
 
         let pProlog = 
             let block = manager.Alloc(nativeint prolog.Length)
@@ -80,6 +76,9 @@ and FragmentProgram<'a> internal(differential : bool, compile : option<'a> -> 'a
         fProlog.WriteJump()
         fProlog, fEpilog
 
+    /// Inserts a new Fragment directly after `ref` with the given tag.
+    /// Note that when the program is "differential" the subsequent Fragment will also be recompiled.
+    /// This Method assumes that `ref` is part of this program and is also not disposed.
     member x.InsertAfter(ref : Fragment<'a>, tag : 'a) =
         if not (isNull ref) && ref.IsDisposed then raise <| ObjectDisposedException "FragmentProgram.InsertAfter reference is disposed" 
         let mutable ref = ref
@@ -90,7 +89,7 @@ and FragmentProgram<'a> internal(differential : bool, compile : option<'a> -> 'a
         let next = ref.Next
 
         let code = 
-            toMemory (fun s ->
+            AssemblerStream.toMemory (fun s ->
                 compile.Invoke(prevTag, tag, s)
                 s.Jump(0)
             )
@@ -111,20 +110,29 @@ and FragmentProgram<'a> internal(differential : bool, compile : option<'a> -> 'a
 
         frag
 
+    /// Inserts a new Fragment directly before `ref` with the given tag.
+    /// Note that when the program is "differential" the `ref` Fragment will also be recompiled.
+    /// This Method assumes that `ref` is part of this program and is also not disposed.
     member x.InsertBefore(ref : Fragment<'a>, tag : 'a) =
         if not (isNull ref) && ref.IsDisposed then raise <| ObjectDisposedException "FragmentProgram.InsertBefore reference is disposed" 
         let ref = if isNull ref then last else ref
         x.InsertAfter(ref.Prev, tag)
 
+    /// Inserts a new Fragment at the end of the program with the given tag.
     member x.Append(tag : 'a) =
         x.InsertBefore(null, tag)
 
+    /// Inserts a new Fragment at the beginning of the program with the given tag.
     member x.Prepend(tag : 'a) =
         x.InsertAfter(null, tag)
 
+    /// The (unchangeable) first Fragment in the Program.
     member x.Prolog = first
+
+    /// The (unchangeable) last Fragment in the Program.
     member x.Epilog = last
 
+    /// Relases all resources associated with this FragmentProgram.
     member x.Dispose() =
         if not (isNull first) then
             first <- null
@@ -135,6 +143,7 @@ and FragmentProgram<'a> internal(differential : bool, compile : option<'a> -> 'a
             NativePtr.free entry
             entry <- NativePtr.zero
 
+    /// Deletes all Fragments from the Program and resets it to its initial state.
     member x.Clear() =
         let mutable f = first.Next
         while not (Object.ReferenceEquals(f, last)) do
@@ -142,6 +151,7 @@ and FragmentProgram<'a> internal(differential : bool, compile : option<'a> -> 'a
             f.Dispose()
             f <- n
 
+    /// Recompiles all necessary Fragments and ensures the program is ready to be executed.
     member x.Update() =
         for u in toUpdate do u.Update(compile)
         toUpdate.Clear()
@@ -157,26 +167,25 @@ and FragmentProgram<'a> internal(differential : bool, compile : option<'a> -> 'a
                 action <- Marshal.GetDelegateForFunctionPointer<System.Action>(ptr)
         )
 
-
+    /// Updates and Executes the program.
     member x.Run() =
         x.Update()
         action.Invoke()
 
+    /// A `nativeptr<nativeint>` holding the entry-pointer for the program.
     member x.EntryPointer = entry
 
     interface IDisposable with
         member x.Dispose() = x.Dispose()
 
+    /// Creates a new FragmentProgram with the given "differential" compile-function.
     new(compile : option<'a> -> 'a -> IAssemblerStream -> unit) = new FragmentProgram<'a>(true, compile)
+    
+    /// Creates a new FragmentProgram with the given "non-differential" compile-function.
     new(compile : 'a -> IAssemblerStream -> unit) = new FragmentProgram<'a>(false, fun _ t s -> compile t s)
 
+/// A Fragment is a part of a FragmentProgram.
 and [<AllowNullLiteral>] Fragment<'a> internal(state : FragmentProgramState<'a>, tag : 'a, ptr : managedptr) =
-    static let toMemory (action : System.IO.Stream -> IAssemblerStream -> unit) : Memory<byte> =
-        use ms = new SystemMemoryStream()
-        use ass = AssemblerStream.create ms
-        action ms ass
-        ass.Jump 0
-        ms.ToMemory()
 
     let mutable ptr = ptr
     let mutable prev : Fragment<'a> = null
@@ -185,34 +194,34 @@ and [<AllowNullLiteral>] Fragment<'a> internal(state : FragmentProgramState<'a>,
 
 
     let writeJump(offset : int) =  
-        let code = 
-            use ms = new SystemMemoryStream()
-            use ass = AssemblerStream.create ms
-            ass.Jump offset
-            ms.ToMemory()
-
+        let code = AssemblerStream.toMemory (fun ass -> ass.Jump offset)
         JitMem.Copy(code, ptr, ptr.Size - nativeint code.Length)
 
-
+    /// Gets the previous Fragment in the Program (or null if none).
     member x.Prev
         with get() : Fragment<'a> = prev
         and internal set (p : Fragment<'a>) = prev <- p
 
+    /// Gets the next Fragment in the Program (or null if none).
     member x.Next
         with get() : Fragment<'a> = next
         and internal set (n : Fragment<'a>) = next <- n
 
+    /// True if the Fragment has previously been disposed.
     member x.IsDisposed : bool = ptr.Free
 
+    /// The start-offset of the Fragment in the Program.
     member x.Offset : nativeint = ptr.Offset
 
-    member x.WriteJump() : unit =
+    /// Rewrites the final jump-instruction
+    member internal x.WriteJump() : unit =
         if isNull next then 
             writeJump 0
         else 
             let ref = ptr.Offset + ptr.Size
             writeJump (int (next.Offset - ref))
 
+    /// Updates the Fragment's content. (also resizing it if necessary)
     member private x.Write(data : Memory<byte>) =
         let size = nativeint data.Length
         if size = ptr.Size then
@@ -227,22 +236,24 @@ and [<AllowNullLiteral>] Fragment<'a> internal(state : FragmentProgramState<'a>,
 
         state.toWriteJump.Add x |> ignore
             
+    /// The tag specified upon creation of the Fragment.
     member x.Tag : 'a = tag
 
+    /// Updates the Fragment's code.
     member internal x.Update(compile : OptimizedClosures.FSharpFunc<option<'a>, 'a, IAssemblerStream, unit>) : unit =
         let prevTag = 
             if Object.ReferenceEquals(prev, state.prolog) then None
             else Some prev.Tag
 
         let code = 
-            toMemory (fun s ass -> 
+            AssemblerStream.toMemory (fun ass -> 
                 compile.Invoke(prevTag, tag, ass)
                 ass.Jump(0)
             )
 
         x.Write code
 
-
+    /// Deletes the Fragment from the FragmentProgram and releases all allocated resources.
     member x.Dispose() : unit =
         let p = prev
         let n = next

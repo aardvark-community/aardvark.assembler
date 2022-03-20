@@ -4,8 +4,8 @@ open System
 open System.IO
 open Aardvark.Base
 
-
-type SystemMemoryStream() =
+/// A in-memory stream that provides `ToMemory() : Memory<byte>` 
+type internal SystemMemoryStream() =
     inherit Stream()
 
     let mutable data = Array.zeroCreate<byte> 128
