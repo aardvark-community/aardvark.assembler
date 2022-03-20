@@ -1,6 +1,6 @@
 # Aardvark.Assembler
 
-[![Test](https://github.com/krauthaufen/Aardvark.Assembler/actions/workflows/test.yml/badge.svg)](https://github.com/krauthaufen/Aardvark.Assembler/actions/workflows/test.yml)
+[![Test](https://github.com/aardvark-community/aardvark.assembler/actions/workflows/test.yml/badge.svg)](https://github.com/aardvark-community/aardvark.assembler/actions/workflows/test.yml)
 
 Provides APIs for:
 * simple native-code generation via `IAssemblerStream`
