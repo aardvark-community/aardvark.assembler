@@ -32,3 +32,5 @@ src/MiniCVNative/build
 /.vscode/*.log
 /src/jitmem/build/
 /bin/pack
+/tmp
+/.fsdocs

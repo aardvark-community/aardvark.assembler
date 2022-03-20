@@ -13,6 +13,12 @@
           "commands": [
                 "aardpack"
           ]
+      },
+      "fsdocs-tool": {
+          "version": "15.0.0",
+          "commands": [
+              "fsdocs"
+          ]
       }
     }
   }

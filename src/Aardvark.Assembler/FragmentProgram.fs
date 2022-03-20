@@ -53,8 +53,8 @@ and FragmentProgram<'a> internal(differential : bool, compile : option<'a> -> 'a
         }
 
     let mutable first, last =
-        let prolog = AssemblerStream.toMemory (fun ass -> ass.BeginFunction())
-        let epilog = AssemblerStream.toMemory (fun ass -> ass.EndFunction(); ass.Ret())
+        let prolog = AssemblerStream.toMemory (fun ass -> ass.BeginFunction(); ass.Jump 0)
+        let epilog = AssemblerStream.toMemory (fun ass -> ass.EndFunction(); ass.Ret(); ass.Jump 0)
 
         let pProlog = 
             let block = manager.Alloc(nativeint prolog.Length)
