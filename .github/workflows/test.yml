@@ -82,6 +82,8 @@ jobs:
       - name: Build
         run: dotnet build Assembler.sln
       - name: Pack
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: dotnet aardpack Assembler.sln --notag
       - name: Upload Packages
         uses: actions/upload-artifact@v2
