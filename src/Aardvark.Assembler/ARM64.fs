@@ -145,7 +145,7 @@ module internal ARM64 =
             Array.take registerArguments registers
 
         static let calleeSavedRegisters =
-            Array.sub registers 19 10
+            Array.sub registers 19 4
 
         let append (instruction : uint32) =
             writer.Write instruction
@@ -324,8 +324,20 @@ module internal ARM64 =
         member x.start() =
             append 0xd10083ffu // sub	sp, sp, #0x20
             append 0xa9017bfdu // stp   x29, x30, [sp, #0x10]
+            x.sub(true, Register.SP, 0x20us, Register.SP)
+            x.store(true, Register.R19, 0u, Register.SP)
+            x.store(true, Register.R20, 8u, Register.SP)
+            x.store(true, Register.R21, 16u, Register.SP)
+            x.store(true, Register.R22, 24u, Register.SP)
+
+
 
         member x.stop() =
+            x.load(true, Register.SP, 0u, Register.R19)
+            x.load(true, Register.SP, 8u, Register.R20)
+            x.load(true, Register.SP, 16u, Register.R21)
+            x.load(true, Register.SP, 24u, Register.R22)
+            x.add(true, Register.SP, 0x20us, Register.SP)
             append 0xa9417bfdu // ldp	x29, x30, [sp, #0x10]
             append 0x910083ffu // add	sp, sp, #0x20
 
@@ -565,12 +577,8 @@ module internal ARM64 =
 
             member x.BeginFunction() =
                 x.start()
-                for i in 0 .. calleeSavedRegisters.Length - 1 do
-                    x.push (unbox<Register> calleeSavedRegisters.[i].Tag)
 
             member x.EndFunction() =
-                for i in calleeSavedRegisters.Length - 1 .. -1 .. 0 do
-                    x.push (unbox<Register> calleeSavedRegisters.[i].Tag)
                 x.stop()
 
             member x.Call(ptr : nativeint) =
