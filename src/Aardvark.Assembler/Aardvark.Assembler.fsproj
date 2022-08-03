@@ -6,10 +6,10 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="SystemMemoryStream.fs" />
+    <Compile Include="JitMem.fs" />
     <Compile Include="ARM64.fs" />
     <Compile Include="AMD64.fs" />
     <Compile Include="Assembler.fs" />
-    <Compile Include="JitMem.fs" />
     <Compile Include="FragmentProgram.fs" />
     <Compile Include="AdaptiveFragmentProgram.fs" />
   </ItemGroup>

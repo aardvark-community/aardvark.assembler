@@ -29,6 +29,13 @@ and FragmentProgram<'a> internal(differential : bool, compile : option<'a> -> 'a
             MemoryManagerConfig.mfree = fun ptr size -> JitMem.Free(ptr, size)
             MemoryManagerConfig.mcopy = fun src dst size -> JitMem.Copy(src, dst, size)
         }
+    
+    static let toMemory (action : IAssemblerStream -> unit) : Memory<byte> =
+        use ms = new SystemMemoryStream()
+        use ass = AssemblerStream.create ms
+        action ass
+        ass.Jump 0
+        ms.ToMemory()
 
     let compile = OptimizedClosures.FSharpFunc<_,_,_,_>.Adapt compile
     let manager = new MemoryManager(initialCapacity, config)
@@ -53,8 +60,8 @@ and FragmentProgram<'a> internal(differential : bool, compile : option<'a> -> 'a
         }
 
     let mutable first, last =
-        let prolog = AssemblerStream.toMemory (fun ass -> ass.BeginFunction(); ass.Jump 0)
-        let epilog = AssemblerStream.toMemory (fun ass -> ass.EndFunction(); ass.Ret(); ass.Jump 0)
+        let prolog = toMemory (fun ass -> ass.BeginFunction())
+        let epilog = toMemory (fun ass -> ass.EndFunction(); ass.Ret())
 
         let pProlog = 
             let block = manager.Alloc(nativeint prolog.Length)
@@ -89,7 +96,7 @@ and FragmentProgram<'a> internal(differential : bool, compile : option<'a> -> 'a
         let next = ref.Next
 
         let code = 
-            AssemblerStream.toMemory (fun s ->
+            toMemory (fun s ->
                 compile.Invoke(prevTag, tag, s)
                 s.Jump(0)
             )
@@ -194,7 +201,12 @@ and [<AllowNullLiteral>] Fragment<'a> internal(state : FragmentProgramState<'a>,
 
 
     let writeJump(offset : int) =  
-        let code = AssemblerStream.toMemory (fun ass -> ass.Jump offset)
+        let code = 
+            use ms = new SystemMemoryStream()
+            use ass = AssemblerStream.create ms
+            ass.Jump offset
+            ms.ToMemory()
+
         JitMem.Copy(code, ptr, ptr.Size - nativeint code.Length)
 
     /// Gets the previous Fragment in the Program (or null if none).

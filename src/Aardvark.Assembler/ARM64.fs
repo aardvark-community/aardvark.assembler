@@ -565,8 +565,12 @@ module internal ARM64 =
 
             member x.BeginFunction() =
                 x.start()
+                for i in 0 .. calleeSavedRegisters.Length - 1 do
+                    x.push (unbox<Register> calleeSavedRegisters.[i].Tag)
 
             member x.EndFunction() =
+                for i in calleeSavedRegisters.Length - 1 .. -1 .. 0 do
+                    x.push (unbox<Register> calleeSavedRegisters.[i].Tag)
                 x.stop()
 
             member x.Call(ptr : nativeint) =
