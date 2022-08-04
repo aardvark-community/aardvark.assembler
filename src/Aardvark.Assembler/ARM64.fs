@@ -12,7 +12,7 @@ open System.Collections.Generic
 #nowarn "9"
 
 /// internal arm64 Assembler (currently only working on MacOS calling convention).
-module internal ARM64 =
+module ARM64 =
     type Register =
         | R0 = 0
         | R1 = 1

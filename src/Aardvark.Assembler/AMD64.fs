@@ -13,7 +13,7 @@ open FSharp.Data.Adaptive
 #nowarn "51"
 
 /// internal AMD64/x64 Assembler.
-module internal AMD64 =
+module AMD64 =
     open System.Runtime.CompilerServices
     type Amd64AssemblerLabel internal() =
         let mutable position = -1L

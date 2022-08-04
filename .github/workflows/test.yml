@@ -4,7 +4,7 @@ on:
     branches:
       - master
 jobs:
-  macos:
+  macos_x64:
     name: MacOS (x64)
     runs-on: macos-11
     steps:  
@@ -24,6 +24,24 @@ jobs:
         run: dotnet build Assembler.sln
       - name: Test
         run: dotnet test -l "console;verbosity=detailed" --no-build --nologo
+      - name: Upload MacOS native libs
+        uses: actions/upload-artifact@v2
+        with:
+          name: mac_x64
+          path: libs/Native/Aardvark.Assembler/mac/AMD64/
+  macos_m1:
+    name: MacOS (M1)
+    runs-on: macos-11
+    steps:  
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Build Native
+        run: ./buildnative.sh arm64
+      - name: Upload MacOS native libs
+        uses: actions/upload-artifact@v2
+        with:
+          name: mac_m1
+          path: libs/Native/Aardvark.Assembler/mac/ARM64/
   linux:
     name: Linux (x64)
     runs-on: ubuntu-18.04
@@ -42,6 +60,11 @@ jobs:
         run: dotnet build Assembler.sln
       - name: Test
         run: dotnet test -l "console;verbosity=detailed" --no-build --nologo
+      - name: Upload Linux native libs
+        uses: actions/upload-artifact@v2
+        with:
+          name: linux_x64
+          path: libs/Native/Aardvark.Assembler/linux/AMD64/
   windows:
     name: Windows (x64)
     runs-on: windows-latest
@@ -60,6 +83,11 @@ jobs:
         run: dotnet build Assembler.sln
       - name: Test
         run: dotnet test -l "console;verbosity=detailed" --no-build --nologo
+      - name: Upload Windows native libs
+        uses: actions/upload-artifact@v2
+        with:
+          name: windows_x64
+          path: libs/Native/Aardvark.Assembler/windows/AMD64/
 
   pack:
     name: Pack
@@ -67,10 +95,31 @@ jobs:
     needs: 
       - linux
       - windows
-      - macos
+      - macos_x64
+      - macos_m1
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+      - name: Download MacOS dependencies (x64)
+        uses: actions/download-artifact@v2
+        with:
+          name: mac_x64
+          path: libs/Native/Aardvark.Assembler/mac/AMD64/
+      - name: Download MacOS dependencies (arm64)
+        uses: actions/download-artifact@v2
+        with:
+          name: mac_m1
+          path: libs/Native/Aardvark.Assembler/mac/ARM64/
+      - name: Download Linux dependencies 
+        uses: actions/download-artifact@v2
+        with:
+          name: linux_x64
+          path: libs/Native/Aardvark.Assembler/linux/AMD64/
+      - name: Download Windows dependencies
+        uses: actions/download-artifact@v2
+        with:
+          name: windows_x64
+          path: libs/Native/Aardvark.Assembler/windows/AMD64/
       - name: Install Dotnet
         uses: actions/setup-dotnet@v1
         with:
