@@ -1,3 +1,6 @@
+### 0.0.5
+* using JitMem on all platforms
+
 ### 0.0.4
 * fixed ARM64 callee-saved registers
 
