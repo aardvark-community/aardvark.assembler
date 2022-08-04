@@ -13,6 +13,9 @@ open Microsoft.FSharp.NativeInterop
 [<AbstractClass; Sealed>]
 type JitMem private() =
     [<DllImport("jitmem")>]
+    static extern bool eiswritable()
+
+    [<DllImport("jitmem")>]
     static extern uint32 epageSize()
 
     [<DllImport("jitmem")>]
@@ -25,6 +28,11 @@ type JitMem private() =
     static extern void ecpy(nativeint dst, nativeint src, unativeint size)
 
     static let mutable pageSize = ref 0un
+
+    static let isWriteable = eiswritable()
+
+    static member IsWritable = isWriteable
+
 
     /// The size of a page in bytes.
     static member PageSize = 
@@ -42,7 +50,7 @@ type JitMem private() =
         if size <= 0n then
             0n
         else
-            if RuntimeInformation.IsOSPlatform OSPlatform.OSX then
+            if true || RuntimeInformation.IsOSPlatform OSPlatform.OSX then
                 let ps = JitMem.PageSize
                 let effectiveSize =
                     if unativeint size % ps = 0un then unativeint size
@@ -54,7 +62,7 @@ type JitMem private() =
     /// Frees executable memory. The size shall be idenitcal to the one used in `Alloc`.
     static member Free(ptr : nativeint, size : nativeint) =
         if size > 0n then
-            if RuntimeInformation.IsOSPlatform OSPlatform.OSX then
+            if true || RuntimeInformation.IsOSPlatform OSPlatform.OSX then
                 let ps = JitMem.PageSize
                 let effectiveSize =
                     if unativeint size % ps = 0un then unativeint size
@@ -66,7 +74,7 @@ type JitMem private() =
     /// Copies the source-pointer to the executable memory-pointer.
     static member Copy(src : nativeint, dst : nativeint, size : nativeint) =
         if size > 0n then
-            if RuntimeInformation.IsOSPlatform OSPlatform.OSX then
+            if true || RuntimeInformation.IsOSPlatform OSPlatform.OSX then
                 ecpy(dst, src, unativeint size)
             else
                 let vSrc = NativePtr.toVoidPtr (NativePtr.ofNativeInt<byte> src)

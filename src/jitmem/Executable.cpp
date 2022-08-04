@@ -16,8 +16,10 @@ DllExport(void*) ealloc(size_t size)
     #if _WIN32
     void* ptr = VirtualAlloc(NULL, size, MEM_COMMIT, PAGE_EXECUTE_READWRITE);
     return ptr;
-    #else
+    #elif __APPLE__
     return mmap(NULL, size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_ANON | MAP_PRIVATE | MAP_JIT, -1, 0);
+    #else
+    return mmap(NULL, size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_ANON | MAP_PRIVATE, -1, 0);
     #endif
 }
 
@@ -39,5 +41,16 @@ DllExport(void) ecpy(void* dst, void* src, size_t size)
     pthread_jit_write_protect_np(1);
     #else
     memcpy(dst, src, size);
+    #endif
+}
+
+DllExport(bool) eiswritable()
+{
+    #if _WIN32
+    return true;
+    #elif __APPLE__
+    return false;
+    #else
+    return true;
     #endif
 }

@@ -8,7 +8,7 @@
 #include <errno.h>
 #include <unistd.h>
 #include <pthread.h>
-
+#include <stdint.h>
 #ifdef __APPLE__
 #include <libkern/OSCacheControl.h>
 #elif WIN32
