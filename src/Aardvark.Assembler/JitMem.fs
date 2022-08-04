@@ -31,8 +31,8 @@ type JitMem private() =
 
     static let isWriteable = eiswritable()
 
+    /// Indicates whether the executable memory is directly writeable while being used for execution.
     static member IsWritable = isWriteable
-
 
     /// The size of a page in bytes.
     static member PageSize = 
@@ -50,38 +50,30 @@ type JitMem private() =
         if size <= 0n then
             0n
         else
-            if true || RuntimeInformation.IsOSPlatform OSPlatform.OSX then
-                let ps = JitMem.PageSize
-                let effectiveSize =
-                    if unativeint size % ps = 0un then unativeint size
-                    else (1un + unativeint size / ps) * ps
-                ealloc effectiveSize
-            else
-                Aardvark.Base.ExecutableMemory.alloc size
+            let ps = JitMem.PageSize
+            let effectiveSize =
+                if unativeint size % ps = 0un then unativeint size
+                else (1un + unativeint size / ps) * ps
+            ealloc effectiveSize
 
     /// Frees executable memory. The size shall be idenitcal to the one used in `Alloc`.
     static member Free(ptr : nativeint, size : nativeint) =
         if size > 0n then
-            if true || RuntimeInformation.IsOSPlatform OSPlatform.OSX then
-                let ps = JitMem.PageSize
-                let effectiveSize =
-                    if unativeint size % ps = 0un then unativeint size
-                    else (1un + unativeint size / ps) * ps
-                efree(ptr, effectiveSize)
-            else
-                Aardvark.Base.ExecutableMemory.free ptr size
+            let ps = JitMem.PageSize
+            let effectiveSize =
+                if unativeint size % ps = 0un then unativeint size
+                else (1un + unativeint size / ps) * ps
+            efree(ptr, effectiveSize)
 
     /// Copies the source-pointer to the executable memory-pointer.
     static member Copy(src : nativeint, dst : nativeint, size : nativeint) =
         if size > 0n then
-            if true || RuntimeInformation.IsOSPlatform OSPlatform.OSX then
+            if isWriteable then
+                let src = System.Span<byte>(NativePtr.toVoidPtr (NativePtr.ofNativeInt<byte> src), int size)
+                let dst = System.Span<byte>(NativePtr.toVoidPtr (NativePtr.ofNativeInt<byte> dst), int size)
+                src.CopyTo dst
+            else 
                 ecpy(dst, src, unativeint size)
-            else
-                let vSrc = NativePtr.toVoidPtr (NativePtr.ofNativeInt<byte> src)
-                let vDst = NativePtr.toVoidPtr (NativePtr.ofNativeInt<byte> dst)
-                let sSrc = System.Span<byte>(vSrc, int size)
-                let sDst = System.Span<byte>(vDst, int size)
-                sSrc.CopyTo(sDst)
 
     /// Copies the given `Memory<byte>` to the executable memory-pointer.
     static member Copy(src : Memory<byte>, dst : nativeint) =

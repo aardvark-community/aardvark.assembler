@@ -3,11 +3,13 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/mman.h>
 #include <string.h>
 #include <errno.h>
+#ifndef _WIN32
 #include <unistd.h>
 #include <pthread.h>
+#include <sys/mman.h>
+#endif
 #include <stdint.h>
 #ifdef __APPLE__
 #include <libkern/OSCacheControl.h>
