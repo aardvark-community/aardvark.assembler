@@ -56,6 +56,8 @@ jobs:
         run: dotnet tool restore
       - name: Paket Restore
         run: dotnet paket restore
+      - name: Build Native
+        run: ./buildnative.sh
       - name: Build
         run: dotnet build Assembler.sln
       - name: Test
@@ -79,6 +81,8 @@ jobs:
         run: dotnet tool restore
       - name: Paket Restore
         run: dotnet paket restore
+      - name: Build Native
+        run: .\buildnative.cmd
       - name: Build
         run: dotnet build Assembler.sln
       - name: Test
