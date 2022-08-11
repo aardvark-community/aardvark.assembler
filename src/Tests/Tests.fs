@@ -656,29 +656,29 @@ let jitMem =
                     JitMem.Free(ptr, nativeint code.Length)
         }
 
-        test "CalleeSaved" {
+        // test "CalleeSaved" {
 
-            init()
-            do
-                let code =
-                    AssemblerStream.toMemory (fun ass ->
-                        ass.BeginFunction()
-                        ass.Set(ass.CalleeSavedRegisters.[0], 10)
-                        ass.Set(ass.CalleeSavedRegisters.[1], 11)
-                        ass.Set(ass.CalleeSavedRegisters.[2], 12)
-                        ass.Set(ass.CalleeSavedRegisters.[3], 13)
-                        ass.EndFunction()
-                        ass.Ret()
-                    )
+        //     init()
+        //     do
+        //         let code =
+        //             AssemblerStream.toMemory (fun ass ->
+        //                 ass.BeginFunction()
+        //                 ass.Set(ass.CalleeSavedRegisters.[0], 10)
+        //                 ass.Set(ass.CalleeSavedRegisters.[1], 11)
+        //                 ass.Set(ass.CalleeSavedRegisters.[2], 12)
+        //                 ass.Set(ass.CalleeSavedRegisters.[3], 13)
+        //                 ass.EndFunction()
+        //                 ass.Ret()
+        //             )
 
-                let ptr = JitMem.Alloc(nativeint code.Length)
-                try
-                    JitMem.Copy(code, ptr)
-                    let action = Marshal.GetDelegateForFunctionPointer<Action>(ptr)
-                    action.Invoke()
-                finally
-                    JitMem.Free(ptr, nativeint code.Length)
-        }
+        //         let ptr = JitMem.Alloc(nativeint code.Length)
+        //         try
+        //             JitMem.Copy(code, ptr)
+        //             let action = Marshal.GetDelegateForFunctionPointer<Action>(ptr)
+        //             action.Invoke()
+        //         finally
+        //             JitMem.Free(ptr, nativeint code.Length)
+        // }
 
         test "BackwardJump" {
 
