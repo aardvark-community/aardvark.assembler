@@ -145,7 +145,7 @@ module ARM64 =
             Array.take registerArguments registers
 
         static let calleeSavedRegisters =
-            Array.sub registers 19 4
+            Array.sub registers 22 4
 
         let append (instruction : uint32) =
             writer.Write instruction
@@ -322,11 +322,11 @@ module ARM64 =
             )
 
         member x.start() =
-            x.sub(true, Register.SP, 0x30us, Register.SP)
-            x.store(true, Register.R19, 0x30u, Register.SP)
-            x.store(true, Register.R20, 0x28u, Register.SP)
-            x.store(true, Register.R21, 0x20u, Register.SP)
-            x.store(true, Register.R22, 0x18u, Register.SP)
+            x.sub(true, Register.SP, 0x40us, Register.SP)
+            x.store(true, Register.R22, 0x30u, Register.SP)
+            x.store(true, Register.R23, 0x28u, Register.SP)
+            x.store(true, Register.R24, 0x20u, Register.SP)
+            x.store(true, Register.R25, 0x18u, Register.SP)
             x.store(true, Register.R29, 0x10u, Register.SP)
             x.store(true, Register.R30, 0x08u, Register.SP)
             
@@ -334,13 +334,13 @@ module ARM64 =
 
 
         member x.stop() =
-            x.load(true, Register.SP, 0x30u, Register.R19)
-            x.load(true, Register.SP, 0x28u, Register.R20)
-            x.load(true, Register.SP, 0x20u, Register.R21)
-            x.load(true, Register.SP, 0x18u, Register.R22)
+            x.load(true, Register.SP, 0x30u, Register.R22)
+            x.load(true, Register.SP, 0x28u, Register.R23)
+            x.load(true, Register.SP, 0x20u, Register.R24)
+            x.load(true, Register.SP, 0x18u, Register.R25)
             x.load(true, Register.SP, 0x10u, Register.R29)
             x.load(true, Register.SP, 0x08u, Register.R30)
-            x.add(true, Register.SP, 0x30us, Register.SP)
+            x.add(true, Register.SP, 0x40us, Register.SP)
 
         member x.push(reg : Register) =
             x.sub(true, Register.SP, 0x10us, Register.SP)
