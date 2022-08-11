@@ -8,7 +8,7 @@ nuget Aardvark.Base.Runtime ~> 5.2.7
 nuget FSharp.Data.Adaptive ~> 1.2.13
 nuget Aardvark.Build ~> 1.0.13
 
-nuget Microsoft.NET.Test.Sdk ~> 16.11.0
+nuget Microsoft.NET.Test.Sdk ~> 17.3.0
 nuget Expecto ~> 9.0.4
 nuget Expecto.FsCheck ~> 9.0.4
-nuget YoloDev.Expecto.TestSdk ~> 0.12.13
+nuget YoloDev.Expecto.TestSdk ~> 0.13.3

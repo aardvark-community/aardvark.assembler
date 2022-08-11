@@ -1,5 +1,5 @@
 ### 0.0.6
-* fixed ARM64 stack problem 
+* fixed ARM64 stack problem
 
 ### 0.0.5
 * using JitMem on all platforms
