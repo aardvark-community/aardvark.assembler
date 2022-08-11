@@ -322,31 +322,32 @@ module ARM64 =
             )
 
         member x.start() =
-            append 0xd10083ffu // sub	sp, sp, #0x20
-            append 0xa9017bfdu // stp   x29, x30, [sp, #0x10]
-            x.sub(true, Register.SP, 0x20us, Register.SP)
-            x.store(true, Register.R19, 0u, Register.SP)
-            x.store(true, Register.R20, 8u, Register.SP)
-            x.store(true, Register.R21, 16u, Register.SP)
-            x.store(true, Register.R22, 24u, Register.SP)
-
+            x.sub(true, Register.SP, 0x30us, Register.SP)
+            x.store(true, Register.R19, 0x30u, Register.SP)
+            x.store(true, Register.R20, 0x28u, Register.SP)
+            x.store(true, Register.R21, 0x20u, Register.SP)
+            x.store(true, Register.R22, 0x18u, Register.SP)
+            x.store(true, Register.R29, 0x10u, Register.SP)
+            x.store(true, Register.R30, 0x08u, Register.SP)
+            
+            
 
 
         member x.stop() =
-            x.load(true, Register.SP, 0u, Register.R19)
-            x.load(true, Register.SP, 8u, Register.R20)
-            x.load(true, Register.SP, 16u, Register.R21)
-            x.load(true, Register.SP, 24u, Register.R22)
-            x.add(true, Register.SP, 0x20us, Register.SP)
-            append 0xa9417bfdu // ldp	x29, x30, [sp, #0x10]
-            append 0x910083ffu // add	sp, sp, #0x20
+            x.load(true, Register.SP, 0x30u, Register.R19)
+            x.load(true, Register.SP, 0x28u, Register.R20)
+            x.load(true, Register.SP, 0x20u, Register.R21)
+            x.load(true, Register.SP, 0x18u, Register.R22)
+            x.load(true, Register.SP, 0x10u, Register.R29)
+            x.load(true, Register.SP, 0x08u, Register.R30)
+            x.add(true, Register.SP, 0x30us, Register.SP)
 
         member x.push(reg : Register) =
             x.sub(true, Register.SP, 0x10us, Register.SP)
-            x.store(true, reg, 0u, Register.SP)
+            x.store(true, reg, 0x08u, Register.SP)
 
         member x.pop(reg : Register) =
-            x.load(true, Register.SP, 0u, reg)
+            x.load(true, Register.SP, 0x08u, reg)
             x.add(true, Register.SP, 0x10us, Register.SP)
 
         member x.load(wide : bool, src : Register, offset : uint32, dst : Register) =
