@@ -588,36 +588,6 @@ let jitMem =
                     JitMem.Free(ptr, nativeint code.Length)
         }
 
-        test "Copy" {
-            init()
-            do
-                let src = [| 123 |]
-                let dst = [| 0 |]
-                use pSrc = fixed src
-                use pDst = fixed dst
-
-                let code =
-                    AssemblerStream.toMemory (fun ass ->
-                        ass.BeginFunction()
-                        
-                        ass.Copy(NativePtr.toNativeInt pSrc, NativePtr.toNativeInt pDst, false)
-
-                        ass.EndFunction()
-                        ass.Ret()
-                    )
-
-                let ptr = JitMem.Alloc(nativeint code.Length)
-                try
-                    JitMem.Copy(code, ptr)
-
-                    let action = Marshal.GetDelegateForFunctionPointer<Action>(ptr)
-
-                    action.Invoke()
-                    Expect.equal dst.[0] 123 "copy failed"
-                finally
-                    JitMem.Free(ptr, nativeint code.Length)
-        }
-
 
         test "PushPop" {
             init()
@@ -803,6 +773,38 @@ let jitMem =
                 finally
                     JitMem.Free(ptr, nativeint code.Length)
         }
+
+
+        test "Copy" {
+            init()
+            do
+                let src = [| 123 |]
+                let dst = [| 0 |]
+                use pSrc = fixed src
+                use pDst = fixed dst
+
+                let code =
+                    AssemblerStream.toMemory (fun ass ->
+                        ass.BeginFunction()
+                        
+                        ass.Copy(NativePtr.toNativeInt pSrc, NativePtr.toNativeInt pDst, false)
+
+                        ass.EndFunction()
+                        ass.Ret()
+                    )
+
+                let ptr = JitMem.Alloc(nativeint code.Length)
+                try
+                    JitMem.Copy(code, ptr)
+
+                    let action = Marshal.GetDelegateForFunctionPointer<Action>(ptr)
+
+                    action.Invoke()
+                    Expect.equal dst.[0] 123 "copy failed"
+                finally
+                    JitMem.Free(ptr, nativeint code.Length)
+        }
+
     ]
 
 type Operation<'a> =
