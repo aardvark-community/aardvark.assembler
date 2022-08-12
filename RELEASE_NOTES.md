@@ -1,3 +1,6 @@
+### 0.0.7
+* fixed AMD64 conditional backward-jumps
+
 ### 0.0.6
 * fixed ARM64 stack problem
 

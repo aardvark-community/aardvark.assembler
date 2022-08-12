@@ -249,13 +249,14 @@ module AMD64 =
         static let fiveByteNop      = [| 0x0Fuy; 0x1Fuy; 0x44uy; 0x00uy; 0x00uy |]
         static let eightByteNop     = [| 0x0Fuy; 0x1Fuy; 0x84uy; 0x00uy; 0x00uy; 0x00uy; 0x00uy; 0x00uy |]
 
-        let pendingOffsets = Dict<AssemblerLabel, List<int64>>()
+        let pendingOffsets = Dict<Amd64AssemblerLabel, List<int64>>()
 
         member x.NewLabel() =   
             let l = Amd64AssemblerLabel()
             Unsafe.As<AssemblerLabel> l
 
         member x.Mark(l : AssemblerLabel) =
+            let l = Unsafe.As<Amd64AssemblerLabel> l
             match pendingOffsets.TryRemove l with
                 | (true, positions) ->
                     let oldPos = stream.Position
@@ -267,9 +268,7 @@ module AMD64 =
                     stream.Position <- oldPos
                 | _ ->
                     ()
-            
-            let ll = Unsafe.As<Amd64AssemblerLabel> l
-            ll.Position <- stream.Position
+            l.Position <- stream.Position
 
         member x.Cmp(l : Register, v : uint32) =
             if l >= Register.XMM0 then
@@ -321,8 +320,9 @@ module AMD64 =
                 writer.Write(modRM)
 
         member x.Jump(l : AssemblerLabel) =
+            let l = Unsafe.As<Amd64AssemblerLabel> l
             if l.Position >= 0L then
-                let offset = 5L + l.Position - stream.Position
+                let offset = l.Position - (stream.Position + 5L)
                 x.Jmp(int offset)
             else
                 x.Jmp(0)
@@ -330,8 +330,9 @@ module AMD64 =
                 set.Add(stream.Position - 4L)
 
         member x.Jump(cond : JumpCondition, l : AssemblerLabel) =
+            let l = Unsafe.As<Amd64AssemblerLabel> l
             if l.Position >= 0L then
-                let offset = 6L + l.Position - stream.Position
+                let offset = l.Position - (stream.Position + 6L)
                 x.Jmp(cond, int offset)
             else
                 x.Jmp(cond, 0)

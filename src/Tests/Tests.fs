@@ -650,39 +650,39 @@ let jitMem =
                     JitMem.Free(ptr, nativeint code.Length)
         }
 
-        // test "BackwardJump" {
+        test "BackwardJump" {
 
-        //     init()
-        //     do
-        //         use ptr = fixed [| 0 |]
-        //         let code =
-        //             AssemblerStream.toMemory (fun ass ->
-        //                 ass.BeginFunction()
+            init()
+            do
+                use ptr = fixed [| 0 |]
+                let code =
+                    AssemblerStream.toMemory (fun ass ->
+                        ass.BeginFunction()
                         
                         
-        //                 let l = ass.NewLabel()
-        //                 ass.Set(ass.ReturnRegister, 0)
-        //                 ass.Mark l
-        //                 ass.Set(ass.ArgumentRegisters.[1], 1)
-        //                 ass.AddInt(ass.ReturnRegister, ass.ArgumentRegisters.[1], false)
-        //                 ass.Set(ass.ArgumentRegisters.[1], NativePtr.toNativeInt ptr)
-        //                 ass.Store(ass.ArgumentRegisters.[1], ass.ReturnRegister, false)
-        //                 ass.Cmp(NativePtr.toNativeInt ptr, 10)
-        //                 ass.Jump(JumpCondition.Less, l)
-        //                 ass.EndFunction()
-        //                 ass.Ret()
-        //             )
+                        let l = ass.NewLabel()
+                        ass.Set(ass.ReturnRegister, 0)
+                        ass.Mark l
+                        ass.Set(ass.ArgumentRegisters.[1], 1)
+                        ass.AddInt(ass.ReturnRegister, ass.ArgumentRegisters.[1], false)
+                        ass.Set(ass.ArgumentRegisters.[1], NativePtr.toNativeInt ptr)
+                        ass.Store(ass.ArgumentRegisters.[1], ass.ReturnRegister, false)
+                        ass.Cmp(NativePtr.toNativeInt ptr, 10)
+                        ass.Jump(JumpCondition.Less, l)
+                        ass.EndFunction()
+                        ass.Ret()
+                    )
 
-        //         let mem = JitMem.Alloc(nativeint code.Length)
-        //         try
-        //             JitMem.Copy(code, mem)
-        //             let action = Marshal.GetDelegateForFunctionPointer<Action>(mem)
-        //             action.Invoke()
+                let mem = JitMem.Alloc(nativeint code.Length)
+                try
+                    JitMem.Copy(code, mem)
+                    let action = Marshal.GetDelegateForFunctionPointer<Action>(mem)
+                    action.Invoke()
                     
-        //             Expect.equal (NativePtr.read ptr) 10 ""
-        //         finally
-        //             JitMem.Free(mem, nativeint code.Length)
-        // }
+                    Expect.equal (NativePtr.read ptr) 10 ""
+                finally
+                    JitMem.Free(mem, nativeint code.Length)
+        }
 
         test "UnconditionalForwardJump" {
             init()
