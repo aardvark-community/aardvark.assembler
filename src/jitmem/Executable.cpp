@@ -26,9 +26,9 @@ DllExport(void*) ealloc(size_t size)
 DllExport(void) efree(void* ptr, size_t size)
 {
     #if _WIN32
-    VirtualFree(ptr, size, MEM_RELEASE);
+    VirtualFree(ptr, 0, MEM_RELEASE); // returns 0 if error
     #else
-    munmap(ptr, size);
+    munmap(ptr, size); // returns 0 if success
     #endif
 }
 
