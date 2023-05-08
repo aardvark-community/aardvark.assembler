@@ -1,3 +1,6 @@
+### 0.0.8
+* fixed JitMem.Free on Windows platforms
+
 ### 0.0.7
 * fixed AMD64 conditional backward-jumps
 
