@@ -44,7 +44,7 @@ jobs:
           path: libs/Native/Aardvark.Assembler/mac/ARM64/
   linux:
     name: Linux (x64)
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     steps:  
       - name: Checkout
         uses: actions/checkout@v2
