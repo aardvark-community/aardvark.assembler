@@ -23,7 +23,7 @@ jobs:
       - name: Build
         run: dotnet build src/Assembler.sln
       - name: Test
-        run: dotnet test -l "console;verbosity=detailed" --no-build --nologo
+        run: dotnet test -l "console;verbosity=detailed" --no-build --nologo src/Assembler.sln
       - name: Upload MacOS native libs
         uses: actions/upload-artifact@v4
         with:
@@ -61,7 +61,7 @@ jobs:
       - name: Build
         run: dotnet build src/Assembler.sln
       - name: Test
-        run: dotnet test -l "console;verbosity=detailed" --no-build --nologo
+        run: dotnet test -l "console;verbosity=detailed" --no-build --nologo src/Assembler.sln
       - name: Upload Linux native libs
         uses: actions/upload-artifact@v4
         with:
@@ -86,7 +86,7 @@ jobs:
       - name: Build
         run: dotnet build src\Assembler.sln
       - name: Test
-        run: dotnet test -l "console;verbosity=detailed" --no-build --nologo
+        run: dotnet test -l "console;verbosity=detailed" --no-build --nologo src\Assembler.sln
       - name: Upload Windows native libs
         uses: actions/upload-artifact@v4
         with:
