@@ -21,7 +21,7 @@ jobs:
       - name: Build Native
         run: ./buildnative.sh
       - name: Build
-        run: dotnet build Assembler.sln
+        run: dotnet build src/Assembler.sln
       - name: Test
         run: dotnet test -l "console;verbosity=detailed" --no-build --nologo
       - name: Upload MacOS native libs
@@ -59,7 +59,7 @@ jobs:
       - name: Build Native
         run: ./buildnative.sh
       - name: Build
-        run: dotnet build Assembler.sln
+        run: dotnet build src/Assembler.sln
       - name: Test
         run: dotnet test -l "console;verbosity=detailed" --no-build --nologo
       - name: Upload Linux native libs
@@ -84,7 +84,7 @@ jobs:
       - name: Build Native
         run: .\buildnative.cmd
       - name: Build
-        run: dotnet build Assembler.sln
+        run: dotnet build src\Assembler.sln
       - name: Test
         run: dotnet test -l "console;verbosity=detailed" --no-build --nologo
       - name: Upload Windows native libs
@@ -133,11 +133,11 @@ jobs:
       - name: Paket Restore
         run: dotnet paket restore
       - name: Build
-        run: dotnet build Assembler.sln
+        run: dotnet build src\Assembler.sln
       - name: Pack
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: dotnet aardpack Assembler.sln --notag
+        run: dotnet aardpack src\Assembler.sln --notag
       - name: Upload Packages
         uses: actions/upload-artifact@v2
         with:
