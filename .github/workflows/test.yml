@@ -9,11 +9,11 @@ jobs:
     runs-on: macos-11
     steps:  
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - name: Install Dotnet
-        uses: actions/setup-dotnet@v1
+        uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '6.0.100'
+          global-json-file: global.json
       - name: Restore Tools
         run: dotnet tool restore
       - name: Paket Restore
@@ -25,7 +25,7 @@ jobs:
       - name: Test
         run: dotnet test -l "console;verbosity=detailed" --no-build --nologo
       - name: Upload MacOS native libs
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: mac_x64
           path: libs/Native/Aardvark.Assembler/mac/AMD64/
@@ -34,11 +34,11 @@ jobs:
     runs-on: macos-11
     steps:  
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - name: Build Native
         run: ./buildnative.sh arm64
       - name: Upload MacOS native libs
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: mac_m1
           path: libs/Native/Aardvark.Assembler/mac/ARM64/
@@ -47,11 +47,11 @@ jobs:
     runs-on: ubuntu-20.04
     steps:  
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - name: Install Dotnet
-        uses: actions/setup-dotnet@v1
+        uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '6.0.100'
+          global-json-file: global.json
       - name: Restore Tools
         run: dotnet tool restore
       - name: Paket Restore
@@ -63,7 +63,7 @@ jobs:
       - name: Test
         run: dotnet test -l "console;verbosity=detailed" --no-build --nologo
       - name: Upload Linux native libs
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: linux_x64
           path: libs/Native/Aardvark.Assembler/linux/AMD64/
@@ -72,11 +72,11 @@ jobs:
     runs-on: windows-latest
     steps:  
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - name: Install Dotnet
-        uses: actions/setup-dotnet@v1
+        uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '6.0.100'
+          global-json-file: global.json
       - name: Restore Tools
         run: dotnet tool restore
       - name: Paket Restore
@@ -88,7 +88,7 @@ jobs:
       - name: Test
         run: dotnet test -l "console;verbosity=detailed" --no-build --nologo
       - name: Upload Windows native libs
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: windows_x64
           path: libs/Native/Aardvark.Assembler/windows/AMD64/
@@ -103,31 +103,31 @@ jobs:
       - macos_m1
     steps:
       - name: Checkout 
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - name: Download MacOS dependencies (x64)
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4
         with:
           name: mac_x64
           path: libs/Native/Aardvark.Assembler/mac/AMD64/
       - name: Download MacOS dependencies (arm64)
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4
         with:
           name: mac_m1
           path: libs/Native/Aardvark.Assembler/mac/ARM64/
       - name: Download Linux dependencies 
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4
         with:
           name: linux_x64
           path: libs/Native/Aardvark.Assembler/linux/AMD64/
       - name: Download Windows dependencies
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4
         with:
           name: windows_x64
           path: libs/Native/Aardvark.Assembler/windows/AMD64/
       - name: Install Dotnet
-        uses: actions/setup-dotnet@v1
+        uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '6.0.100'
+          global-json-file: global.json
       - name: Restore Tools
         run: dotnet tool restore
       - name: Paket Restore
@@ -139,7 +139,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: dotnet aardpack src\Assembler.sln --notag
       - name: Upload Packages
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: packages
           path: bin\pack
