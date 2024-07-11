@@ -1,12 +1,8 @@
-﻿open System
-open Aardvark.Base
+﻿open Aardvark.Base
 open System.Runtime.InteropServices
-open System.Runtime.CompilerServices
-open Microsoft.FSharp.NativeInterop
 open FSharp.Data.Adaptive
-open Aardvark.Base.Runtime
 open Aardvark.Assembler
-open System.Collections.Generic
+
 #nowarn "9"
 
 type IntDelegate = delegate of unit -> int

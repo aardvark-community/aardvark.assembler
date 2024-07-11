@@ -4,14 +4,13 @@ open System
 open System.IO
 open System.Runtime.InteropServices
 open Aardvark.Base
-open Aardvark.Base.Runtime
 
 /// AssemblerStream functions.
 module AssemblerStream =
     /// Creates a new AssemblerStream writing to the given stream.
     let create (s : Stream) =
         match RuntimeInformation.ProcessArchitecture with
-        | Architecture.X64 -> new Aardvark.Assembler.AMD64.AssemblerStream(s, true) :> IAssemblerStream
+        | Architecture.X64 -> new AMD64.AssemblerStream(s, true) :> IAssemblerStream
         | Architecture.Arm64 -> new ARM64.Arm64Stream(s, true) :> IAssemblerStream
         | a -> raise <| new NotSupportedException(sprintf "unsupported architecture: %A" a)
 

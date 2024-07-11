@@ -1,8 +1,6 @@
-FSharp.Core
-Aardvark.Base
-Aardvark.Base.Runtime
+group Test
+
 Microsoft.NET.Test.Sdk
 YoloDev.Expecto.TestSdk
 Expecto
 Expecto.FsCheck
-FSharp.Data.Adaptive

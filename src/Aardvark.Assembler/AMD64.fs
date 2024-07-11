@@ -4,7 +4,6 @@ open System
 open System.Collections.Generic
 open System.IO
 open Aardvark.Base
-open Aardvark.Base.Runtime
 open System.Runtime.InteropServices
 open Microsoft.FSharp.NativeInterop
 open FSharp.Data.Adaptive
@@ -123,38 +122,38 @@ module AMD64 =
 
     let private registers =
         [|
-            Aardvark.Base.Runtime.Register("rax", 0)
-            Aardvark.Base.Runtime.Register("rcx", 1)
-            Aardvark.Base.Runtime.Register("rdx", 2)
-            Aardvark.Base.Runtime.Register("rbx", 3)
-            Aardvark.Base.Runtime.Register("rsp", 4)
-            Aardvark.Base.Runtime.Register("rbp", 5)
-            Aardvark.Base.Runtime.Register("rsi", 6)
-            Aardvark.Base.Runtime.Register("rdi", 7)
-            Aardvark.Base.Runtime.Register("r8", 8)
-            Aardvark.Base.Runtime.Register("r9", 9)
-            Aardvark.Base.Runtime.Register("r10", 10)
-            Aardvark.Base.Runtime.Register("r11", 11)
-            Aardvark.Base.Runtime.Register("r12", 12)
-            Aardvark.Base.Runtime.Register("r13", 13)
-            Aardvark.Base.Runtime.Register("r14", 14)
-            Aardvark.Base.Runtime.Register("r15", 15)
-            Aardvark.Base.Runtime.Register("xmm0", 16)
-            Aardvark.Base.Runtime.Register("xmm1", 17)
-            Aardvark.Base.Runtime.Register("xmm2", 18)
-            Aardvark.Base.Runtime.Register("xmm3", 19)
-            Aardvark.Base.Runtime.Register("xmm4", 20)
-            Aardvark.Base.Runtime.Register("xmm5", 21)
-            Aardvark.Base.Runtime.Register("xmm6", 22)
-            Aardvark.Base.Runtime.Register("xmm7", 23)
-            Aardvark.Base.Runtime.Register("xmm8", 24)
-            Aardvark.Base.Runtime.Register("xmm9", 25)
-            Aardvark.Base.Runtime.Register("xmm10", 26)
-            Aardvark.Base.Runtime.Register("xmm11", 27)
-            Aardvark.Base.Runtime.Register("xmm12", 28)
-            Aardvark.Base.Runtime.Register("xmm13", 29)
-            Aardvark.Base.Runtime.Register("xmm14", 30)
-            Aardvark.Base.Runtime.Register("xmm15", 31)
+            Aardvark.Assembler.Register("rax", 0)
+            Aardvark.Assembler.Register("rcx", 1)
+            Aardvark.Assembler.Register("rdx", 2)
+            Aardvark.Assembler.Register("rbx", 3)
+            Aardvark.Assembler.Register("rsp", 4)
+            Aardvark.Assembler.Register("rbp", 5)
+            Aardvark.Assembler.Register("rsi", 6)
+            Aardvark.Assembler.Register("rdi", 7)
+            Aardvark.Assembler.Register("r8", 8)
+            Aardvark.Assembler.Register("r9", 9)
+            Aardvark.Assembler.Register("r10", 10)
+            Aardvark.Assembler.Register("r11", 11)
+            Aardvark.Assembler.Register("r12", 12)
+            Aardvark.Assembler.Register("r13", 13)
+            Aardvark.Assembler.Register("r14", 14)
+            Aardvark.Assembler.Register("r15", 15)
+            Aardvark.Assembler.Register("xmm0", 16)
+            Aardvark.Assembler.Register("xmm1", 17)
+            Aardvark.Assembler.Register("xmm2", 18)
+            Aardvark.Assembler.Register("xmm3", 19)
+            Aardvark.Assembler.Register("xmm4", 20)
+            Aardvark.Assembler.Register("xmm5", 21)
+            Aardvark.Assembler.Register("xmm6", 22)
+            Aardvark.Assembler.Register("xmm7", 23)
+            Aardvark.Assembler.Register("xmm8", 24)
+            Aardvark.Assembler.Register("xmm9", 25)
+            Aardvark.Assembler.Register("xmm10", 26)
+            Aardvark.Assembler.Register("xmm11", 27)
+            Aardvark.Assembler.Register("xmm12", 28)
+            Aardvark.Assembler.Register("xmm13", 29)
+            Aardvark.Assembler.Register("xmm14", 30)
+            Aardvark.Assembler.Register("xmm15", 31)
         |]
 
     let private calleeSaved = localConvention.calleeSaved |> Array.map (int >> Array.get registers)
@@ -180,7 +179,7 @@ module AMD64 =
 
     [<AutoOpen>]
     module private Amd64Arguments =
-        type Reg = Aardvark.Base.Runtime.Register
+        type Reg = Aardvark.Assembler.Register
 
         let inline reg (r : Reg) = unbox<Register> r.Tag
 
@@ -984,11 +983,11 @@ module AMD64 =
             member x.ReturnRegister = returnRegister
 
 
-            member x.Push(r : Runtime.Register) = x.Push(unbox<Register> r.Tag)
-            member x.Pop(r : Runtime.Register) = x.Pop(unbox<Register> r.Tag)
-            member x.Mov(target : Runtime.Register, source : Runtime.Register) = x.Mov(unbox<Register> target.Tag, unbox<Register> source.Tag, true)
-            member x.Load(target : Runtime.Register, source : Runtime.Register, wide : bool) = x.Load(unbox<Register> target.Tag, unbox<Register> source.Tag, wide)
-            member x.Store(target : Runtime.Register, source : Runtime.Register, wide : bool) = x.Store(unbox<Register> target.Tag, unbox<Register> source.Tag, wide)
+            member x.Push(r) = x.Push(unbox<Register> r.Tag)
+            member x.Pop(r) = x.Pop(unbox<Register> r.Tag)
+            member x.Mov(target, source) = x.Mov(unbox<Register> target.Tag, unbox<Register> source.Tag, true)
+            member x.Load(target, source, wide : bool) = x.Load(unbox<Register> target.Tag, unbox<Register> source.Tag, wide)
+            member x.Store(target, source, wide : bool) = x.Store(unbox<Register> target.Tag, unbox<Register> source.Tag, wide)
 
             
             member x.NewLabel() = x.NewLabel()
@@ -1034,9 +1033,9 @@ module AMD64 =
             member x.WriteOutput(v : int) = x.Mov(Register.Rax, v)
             member x.WriteOutput(v : float32) = x.Mov(Register.XMM0, v)
 
-            member x.Set(target : Runtime.Register, value : nativeint) = x.Mov(unbox target.Tag, value)
-            member x.Set(target : Runtime.Register, value : int) = x.Mov(unbox target.Tag, value)
-            member x.Set(target : Runtime.Register, value : float32) = x.Mov(unbox target.Tag, value)
+            member x.Set(target : Aardvark.Assembler.Register, value : nativeint) = x.Mov(unbox target.Tag, value)
+            member x.Set(target : Aardvark.Assembler.Register, value : int) = x.Mov(unbox target.Tag, value)
+            member x.Set(target : Aardvark.Assembler.Register, value : float32) = x.Mov(unbox target.Tag, value)
 
             member x.Jump(offset : int) = x.Jmp(offset)
 

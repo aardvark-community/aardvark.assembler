@@ -4,7 +4,6 @@ open System
 open System.Runtime.InteropServices
 open Microsoft.FSharp.NativeInterop
 open Aardvark.Base
-open Aardvark.Base.Runtime
 
 #nowarn "9"
 

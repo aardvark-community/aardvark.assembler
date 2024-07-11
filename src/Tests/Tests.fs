@@ -10,7 +10,6 @@ open System.Runtime.InteropServices
 open FsCheck
 
 #nowarn "9"
-open Aardvark.Base.Runtime
 
 type IntAction = delegate of int -> unit
 type NativeIntAction = delegate of nativeint -> unit

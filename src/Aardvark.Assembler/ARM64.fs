@@ -3,11 +3,9 @@ namespace Aardvark.Assembler
 open System
 open System.IO
 open Aardvark.Base
-open Aardvark.Base.Runtime
 open System.Runtime.InteropServices
 open System.Runtime.CompilerServices
 open Microsoft.FSharp.NativeInterop
-open System.Collections.Generic
 
 #nowarn "9"
 
@@ -64,7 +62,7 @@ module ARM64 =
 
     [<AutoOpen>]
     module private Arm64Arguments =
-        type Reg = Aardvark.Base.Runtime.Register
+        type Reg = Aardvark.Assembler.Register
 
         let inline reg (r : Reg) = unbox<Register> r.Tag
 

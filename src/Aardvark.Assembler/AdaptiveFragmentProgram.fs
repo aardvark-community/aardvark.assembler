@@ -1,10 +1,6 @@
 namespace Aardvark.Assembler
 
-open System
-open System.Runtime.InteropServices
-open Microsoft.FSharp.NativeInterop
 open Aardvark.Base
-open Aardvark.Base.Runtime
 open FSharp.Data.Adaptive
 
 #nowarn "9"
