@@ -11,7 +11,6 @@
     <Compile Include="Program.fs" />
     <None Include="paket.references" />
   </ItemGroup>
-  <ItemGroup />
   <ItemGroup>
     <ProjectReference Include="..\Aardvark.Assembler\Aardvark.Assembler.fsproj" />
   </ItemGroup>

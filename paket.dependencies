@@ -5,8 +5,8 @@ storage: none
 nuget Aardvark.Build            ~> 1.0.22
 nuget FSharp.Core               >= 8.0.0 lowest_matching: true
 
-nuget Aardvark.Base             ~> 5.3.0-prerelease0002
-nuget Aardvark.Base.Runtime     ~> 5.3.0-prerelease0002
+nuget Aardvark.Base             ~> 5.3.0
+nuget Aardvark.Base.Runtime     ~> 5.3.0
 nuget FSharp.Data.Adaptive      ~> 1.2.13
 
 group Test
