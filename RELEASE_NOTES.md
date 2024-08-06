@@ -1,5 +1,8 @@
-### 0.1.0-prerelease0001
+### 0.1.0
 - Updated to .NET 8 and Aardvark.Base 5.3
+
+### 0.1.0-prerelease0001
+- Updated to .NET 8 and Aardvark.Base 5.3 (prerelease)
 
 ### 0.0.8
 * fixed JitMem.Free on Windows platforms
