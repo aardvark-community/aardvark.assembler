@@ -1,8 +1,6 @@
-name: Publish
+name: Build Native
 on:
-  push:
-    branches:
-      - disabled
+  workflow_dispatch:
 jobs:
   macos_x64:
     name: MacOS (x64)
@@ -35,8 +33,20 @@ jobs:
     steps:  
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Install Dotnet
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Restore Tools
+        run: dotnet tool restore
+      - name: Paket Restore
+        run: dotnet paket restore
       - name: Build Native
         run: ./buildnative.sh arm64
+      - name: Build
+        run: dotnet build src/Assembler.sln
+      - name: Test
+        run: dotnet test -l "console;verbosity=detailed" --no-build --nologo src/Assembler.sln
       - name: Upload MacOS native libs
         uses: actions/upload-artifact@v4
         with:
@@ -93,8 +103,8 @@ jobs:
           name: windows_x64
           path: libs/Native/Aardvark.Assembler/windows/AMD64/
 
-  pack:
-    name: Pack
+  pull-request:
+    name: Create pull request
     runs-on: windows-latest
     needs: 
       - linux
@@ -124,33 +134,10 @@ jobs:
         with:
           name: windows_x64
           path: libs/Native/Aardvark.Assembler/windows/AMD64/
-      - name: Install Dotnet
-        uses: actions/setup-dotnet@v4
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v7
         with:
-          global-json-file: global.json
-      - name: Restore Tools
-        run: dotnet tool restore
-      - name: Paket Restore
-        run: dotnet paket restore
-      - name: Build
-        run: dotnet build src\Assembler.sln
-      - name: Pack
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: dotnet aardpack src\Assembler.sln --notag
-      - name: Upload Packages
-        uses: actions/upload-artifact@v4
-        with:
-          name: packages
-          path: bin\pack
-      - name: GitHub Packages
-        env:
-          NUGET_KEY: ${{ secrets.GITHUB_TOKEN }}
-        shell: cmd
-        run: dotnet nuget push "bin\pack\*.nupkg" -k %NUGET_KEY% -s "https://nuget.pkg.github.com/aardvark-community/index.json" --skip-duplicate
-      - name: NuGet
-        env:
-          NUGET_KEY: ${{ secrets.NUGET_KEY }}
-        shell: cmd
-        run: dotnet nuget push "bin\pack\*.nupkg" -k %NUGET_KEY% -s "https://api.nuget.org/v3/index.json" --skip-duplicate
+          commit-message: "Update native libraries"
+          branch: native-ci-build
+          title: "Update native libraries"
  
