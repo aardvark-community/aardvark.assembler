@@ -1,8 +1,8 @@
 # Aardvark.Assembler
 
-[![Test](https://github.com/aardvark-community/aardvark.assembler/actions/workflows/test.yml/badge.svg)](https://github.com/aardvark-community/aardvark.assembler/actions/workflows/test.yml)
-[![NuGet](https://badgen.net/nuget/v/Aardvark.Data.Ifc)](https://www.nuget.org/packages/Aardvark.Data.Ifc/)
-[![NuGet](https://badgen.net/nuget/dt/Aardvark.Data.Ifc)](https://www.nuget.org/packages/Aardvark.Data.Ifc/)
+[![Publish](https://github.com/aardvark-community/aardvark.assembler/actions/workflows/publish.yml/badge.svg)](https://github.com/aardvark-community/aardvark.assembler/actions/workflows/publish.yml)
+[![Version](https://img.shields.io/nuget/vpre/aardvark.assembler)](https://www.nuget.org/packages/aardvark.assembler/)
+[![Downloads](https://img.shields.io/nuget/dt/aardvark.assembler)](https://www.nuget.org/packages/aardvark.assembler/)
 
 Provides APIs for:
 * simple native-code generation via `IAssemblerStream`

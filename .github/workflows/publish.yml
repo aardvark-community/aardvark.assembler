@@ -1,4 +1,4 @@
-name: Test
+name: Publish
 on:
   push:
     branches:
@@ -6,7 +6,7 @@ on:
 jobs:
   macos_x64:
     name: MacOS (x64)
-    runs-on: macos-12
+    runs-on: macos-15-intel
     steps:  
       - name: Checkout
         uses: actions/checkout@v4
@@ -31,7 +31,7 @@ jobs:
           path: libs/Native/Aardvark.Assembler/mac/AMD64/
   macos_m1:
     name: MacOS (M1)
-    runs-on: macos-12
+    runs-on: macos-14
     steps:  
       - name: Checkout
         uses: actions/checkout@v4
@@ -44,7 +44,7 @@ jobs:
           path: libs/Native/Aardvark.Assembler/mac/ARM64/
   linux:
     name: Linux (x64)
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:  
       - name: Checkout
         uses: actions/checkout@v4
@@ -69,7 +69,7 @@ jobs:
           path: libs/Native/Aardvark.Assembler/linux/AMD64/
   windows:
     name: Windows (x64)
-    runs-on: windows-latest
+    runs-on: windows-2022
     steps:  
       - name: Checkout
         uses: actions/checkout@v4
