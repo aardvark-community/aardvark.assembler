@@ -1,24 +1,27 @@
 {
-    "version": 1,
-    "isRoot": true,
-    "tools": {
-      "paket": {
-        "version": "10.0.0-alpha011",
-        "commands": [
-          "paket"
-        ]
-      },
-      "aardpack": {
-          "version": "2.0.5",
-          "commands": [
-                "aardpack"
-          ]
-      },
-      "fsdocs-tool": {
-          "version": "15.0.0",
-          "commands": [
-              "fsdocs"
-          ]
-      }
+  "version": 1,
+  "isRoot": true,
+  "tools": {
+    "paket": {
+      "version": "10.0.0-alpha011",
+      "commands": [
+        "paket"
+      ],
+      "rollForward": false
+    },
+    "aardpack": {
+      "version": "2.0.6",
+      "commands": [
+        "aardpack"
+      ],
+      "rollForward": false
+    },
+    "fsdocs-tool": {
+      "version": "15.0.0",
+      "commands": [
+        "fsdocs"
+      ],
+      "rollForward": false
     }
   }
+}
