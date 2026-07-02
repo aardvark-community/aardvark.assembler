@@ -7,98 +7,129 @@ jobs:
     runs-on: macos-15-intel
     steps:  
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
+
       - name: Install Dotnet
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           global-json-file: global.json
+
       - name: Restore Tools
         run: dotnet tool restore
+
       - name: Paket Restore
         run: dotnet paket restore
+
       - name: Build Native
         run: ./buildnative.sh
+
       - name: Build
         run: dotnet build src/Assembler.sln
+
       - name: Test
         run: dotnet test -l "console;verbosity=detailed" --no-build --nologo src/Assembler.sln
+
       - name: Upload MacOS native libs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: mac_x64
           path: libs/Native/Aardvark.Assembler/mac/AMD64/
+
   macos_m1:
     name: MacOS (M1)
     runs-on: macos-14
     steps:  
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
+
       - name: Install Dotnet
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           global-json-file: global.json
+
       - name: Restore Tools
         run: dotnet tool restore
+
       - name: Paket Restore
         run: dotnet paket restore
+
       - name: Build Native
         run: ./buildnative.sh arm64
+
       - name: Build
         run: dotnet build src/Assembler.sln
+
       - name: Test
         run: dotnet test -l "console;verbosity=detailed" --no-build --nologo src/Assembler.sln
+
       - name: Upload MacOS native libs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: mac_m1
           path: libs/Native/Aardvark.Assembler/mac/ARM64/
+
   linux:
     name: Linux (x64)
     runs-on: ubuntu-22.04
     steps:  
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
+
       - name: Install Dotnet
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           global-json-file: global.json
+
       - name: Restore Tools
         run: dotnet tool restore
+
       - name: Paket Restore
         run: dotnet paket restore
+
       - name: Build Native
         run: ./buildnative.sh
+
       - name: Build
         run: dotnet build src/Assembler.sln
+
       - name: Test
         run: dotnet test -l "console;verbosity=detailed" --no-build --nologo src/Assembler.sln
+
       - name: Upload Linux native libs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: linux_x64
           path: libs/Native/Aardvark.Assembler/linux/AMD64/
+
   windows:
     name: Windows (x64)
     runs-on: windows-2022
     steps:  
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
+
       - name: Install Dotnet
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           global-json-file: global.json
+
       - name: Restore Tools
         run: dotnet tool restore
+
       - name: Paket Restore
         run: dotnet paket restore
+
       - name: Build Native
         run: .\buildnative.cmd
+
       - name: Build
         run: dotnet build src\Assembler.sln
+
       - name: Test
         run: dotnet test -l "console;verbosity=detailed" --no-build --nologo src\Assembler.sln
+
       - name: Upload Windows native libs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: windows_x64
           path: libs/Native/Aardvark.Assembler/windows/AMD64/
@@ -113,27 +144,32 @@ jobs:
       - macos_m1
     steps:
       - name: Checkout 
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
+
       - name: Download MacOS dependencies (x64)
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: mac_x64
           path: libs/Native/Aardvark.Assembler/mac/AMD64/
+
       - name: Download MacOS dependencies (arm64)
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: mac_m1
           path: libs/Native/Aardvark.Assembler/mac/ARM64/
+
       - name: Download Linux dependencies 
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: linux_x64
           path: libs/Native/Aardvark.Assembler/linux/AMD64/
+
       - name: Download Windows dependencies
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: windows_x64
           path: libs/Native/Aardvark.Assembler/windows/AMD64/
+
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v7
         with:
